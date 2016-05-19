@@ -25,7 +25,7 @@ SPHERES = [
     "r", "g",
     "b"
 ]
-
+# git test again
 def cos_of_vector(p1_bgr, p2_bgr):
     """
     p1, p2:(r,g,b) point
