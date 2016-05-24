@@ -14,7 +14,7 @@ from sklearn.decomposition import PCA
 
 VECTOR_DIMENSION = 36
 K = 20
-HEMISPHERE_NUM = 15
+HEMISPHERE_NUM = 5
 COS_FOR_SKELETON = 0.95
 KS_LENGTH = 0
 K_MAX = 6
@@ -25,7 +25,7 @@ SPHERES = [
     "r", "g",
     "b"
 ]
-# git test again
+
 def cos_of_vector(p1_bgr, p2_bgr):
     """
     p1, p2:(r,g,b) point
@@ -416,7 +416,7 @@ class ColorRemover:
             # find intersect points
             for slice_seq in range(1, HEMISPHERE_NUM+1):
                 r = self.slice_width*slice_seq
-                intersect_points = filter(lambda point:is_intersect(point, r), points)
+                intersect_points = filter(lambda point: is_intersect(point, r), points)
                 if intersect_points:
                     color_line_points.append(tuple(map(np.mean, zip(*intersect_points))))
             # if points' number is less than 2 (not enough for skeleton) then
@@ -437,28 +437,29 @@ class ColorRemover:
 
     def generate_color_lines(self):
         """
-        read color line points of each cluster(label), then connect then as lines.
+        read color line points of each cluster(label), then connect them as lines.
         If angle between neighbor lines is small enough then merge then as one single line.
         :return:
         """
         for label in self.color_line_points:
             points = self.color_line_points[label]
-            line = tuple(points[:2])
+            line = tuple(points[:2])  # first two points as the first line
             for i in range(2, len(points)):
                 next_line = line[1], points[i]
                 # test angle
                 vec = np.array(line[1]) - np.array(line[0])
                 next_vec = np.array(next_line[1]) - np.array(next_line[0])
                 cos = cos_of_vector(vec, next_vec)
-                if cos > COS_FOR_SKELETON:
+                if cos > COS_FOR_SKELETON:  # close enough
                     line = line[0], next_line[1]
                 else:
                     self.color_lines[label] = self.color_lines.get(label, []) + [line, ]
                     line = next_line
-            if label in self.color_lines:
-                self.color_lines[label].append(line)
-            else:
-                self.color_lines[label] = [line, ]
+            self.color_lines[label] = self.color_lines.get(label, []) + [line, ]
+            # if label in self.color_lines:
+            #     self.color_lines[label].append(line)
+            # else:
+            #     self.color_lines[label] = [line, ]
 
     def cluster_points_to_color_line(self):
         """
@@ -919,6 +920,8 @@ class ColorRemover:
             # init vars
             # pixels and points that is with a position on sphere
             # used for clustering
+
+            # one point(angle of polar coordinate) on sphere corresponding to some pixels/points
             self.pixels_of_angle_in_sphere[sphere] = {}
             self.points_of_angle_in_sphere[sphere] = {}
 
@@ -983,7 +986,7 @@ class ColorRemover:
                     if not (x1 < angle_a < x2 and y1 < angle_b < y2):
                         continue
                     find = True
-                    dist = np.power(A*angle_a+B*angle_b+C,2)/(A*A+B*B)
+                    dist = np.power(A*angle_a+B*angle_b+C, 2)/(A*A+B*B)
                     if dist <= min_dist:
                         min_dist = dist
                         min_line = (A, B, C)
@@ -998,7 +1001,7 @@ class ColorRemover:
 
                 piexls = self.pixels_of_angle_in_sphere[sphere][(angle_a, angle_b)]
                 self.points_of_hough_line_in_sphere[sphere][min_line] = \
-                    self.points_of_hough_line_in_sphere[sphere].get(min_line,[]) +\
+                    self.points_of_hough_line_in_sphere[sphere].get(min_line, []) +\
                     [self.img.get_bgr_value(p) for p in piexls]
                 for point in self.points_of_hough_line_in_sphere[sphere][min_line]:
                     self.hough_line_of_point_in_sphere[sphere][point] = min_line
@@ -1058,11 +1061,12 @@ class ColorRemover:
         self.adjust_color()
         dir_name = DIR_NAME + self.img.img_name
         cv2.imwrite(dir_name+"/result.bmp", self.gray_after_adjust)
-        cv2.imshow("result",self.gray_after_adjust)
+        cv2.imshow("result", self.gray_after_adjust)
+        cv2.waitKey()
         print "done"
 
 if __name__ == "__main__":
-    files = ["img/man.bmp", "img/bird.bmp","img/nasu.bmp"]
+    files = ["img/man.bmp", "img/bird.bmp", "img/nasu.bmp"]
     # files = ["img/bird.bmp"]
     for file in files:
         cr = ColorRemover(file)
