@@ -1,3 +1,6 @@
+__author__ = 'wtq'
+# apply KM when generate hough lines to reduce number of lines
+# including 3 planes and 4 spheres
 # coding=utf-8
 __author__ = 'wtq'
 import cv2
@@ -12,9 +15,10 @@ from sklearn.datasets import make_blobs
 import os
 from sklearn.decomposition import PCA
 
+NUM_OF_HOUGH_LINE = 6
 VECTOR_DIMENSION = 36
 K = 20
-HEMISPHERE_NUM = 5
+HEMISPHERE_NUM = 30
 COS_FOR_SKELETON = 0.95
 KS_LENGTH = 0
 K_MAX = 6
@@ -22,8 +26,11 @@ DIR_NAME = "sphere_hough_"
 
 SPHERES = [
     # "rgb",
-    "r", "g",
-    "b"
+    # "r", "g",
+    # "b",
+    "rg",
+    "rb",
+    "gb",
 ]
 
 def cos_of_vector(p1_bgr, p2_bgr):
@@ -322,12 +329,12 @@ class ColorRemover:
         # descriptors = PCA(n_components=int(VECTOR_DIMENSION)/2).fit_transform(descriptors)
         # print "done"
         # initial k-m
-        km = KMeans(n_clusters=K,max_iter=600)
+        km = KMeans(n_clusters=K, max_iter=600)
 
         # apply k-m
         labels = km.fit_predict(descriptors)
         # ret,labels,center=cv2.kmeans(descriptors,2,None,criteria,10,cv2.KMEANS_RANDOM_CENTERS)
-        # self.labels_map = labels.reshape(self.img.rows, self.img.cols)
+        # self.labels_map = labels.reshape(self._img.rows, self._img.cols)
 
         for i in range(len(labels)):
             xy = fg_pixels[i]
@@ -357,7 +364,7 @@ class ColorRemover:
         # apply k-m
         compactness, labels, centers = cv2.kmeans(descriptors, 10, criteria, 10, flags)
         # ret,labels,center=cv2.kmeans(descriptors,2,None,criteria,10,cv2.KMEANS_RANDOM_CENTERS)
-        # self.labels_map = labels.reshape(self.img.rows, self.img.cols)
+        # self.labels_map = labels.reshape(self._img.rows, self._img.cols)
 
         for i in range(len(labels)):
             xy = fg_pixels[i]
@@ -591,7 +598,7 @@ class ColorRemover:
                     if (xx, yy) not in self.pixels_of_color_line[color_line]:
                         continue
                     points.append(self.img.get_bgr_value((xx, yy)))
-            point_norm_list = map(lambda point: self.img.get_bgr_norm(point), points)
+            point_norm_list = map(self.img.get_bgr_norm, points)
             point_norm = sum(point_norm_list) / float(len(point_norm_list))
             if point_norm == 0:
                 continue
@@ -604,14 +611,12 @@ class ColorRemover:
                     if (xx, yy) not in self.pixels_of_color_line[to_color_line]:
                         continue
                     to_points.append(self.img.get_bgr_value((xx, yy), self.img_after_adjust))
-            to_point_norm_list = map(lambda point: self.img.get_bgr_norm(point), to_points)
+            to_point_norm_list = map(self.img.get_bgr_norm, to_points)
             to_point_norm = sum(to_point_norm_list) / float(len(to_point_norm_list))
             _k = to_point_norm / float(point_norm)
-            if _k > 10:
-                print "to/from list:", to_point_norm_list, point_norm_list
-                print "to/from:", to_point_norm, point_norm
-
-                # raw_input()
+            # if _k > 10:
+            #     print "to/from list:", to_point_norm_list, point_norm_list
+            #     print "to/from:", to_point_norm, point_norm
             ks.append(_k)
 
         # find best ks with least var
@@ -621,6 +626,7 @@ class ColorRemover:
             mean = np.mean(ks)
         if mean > K_MAX:
             mean = K_MAX
+        print "ks:", ks
         return mean
 
     @staticmethod
@@ -749,6 +755,8 @@ class ColorRemover:
         dic = map(lambda d: d[0], dic)
         for line in dic:
             if line not in self.color_line_adjusted and line in self.pixels_of_color_line and line in self.pixel_edges:
+                if len(self.points_of_color_line[color_line]) < 100:
+                    continue
                 self.transform_points(line, color_line)
 
     def adjust_color(self):
@@ -768,11 +776,13 @@ class ColorRemover:
             if not self.pixels_of_color_line[color_line]:
                 continue
             if color_line not in self.color_line_adjusted and color_line in self.pixel_edges:
+                if len(self.points_of_color_line[color_line]) < 100:
+                    continue
                 self.transform_points(color_line)
-        # normalize img
-        self.show_histogram_of_mat(self.img_after_adjust, "histogram of img after adjust before normalize", limit=7700)
+        # normalize _img
+        self.show_histogram_of_mat(self.img_after_adjust, "histogram of _img after adjust before normalize", limit=7700)
         self.img_after_adjust = self.normalize(self.img_after_adjust)
-        self.show_histogram_of_mat(self.img_after_adjust, "histogram of img after adjust")
+        self.show_histogram_of_mat(self.img_after_adjust, "histogram of _img after adjust")
         for x, y in self.img.pixels_points:
             for c in range(3):
                 v = self.img_after_adjust.item((x, y, c))
@@ -788,7 +798,7 @@ class ColorRemover:
         self.img.fig_set_label(ax)
         self.img.fig_draw_lines(ax, lines)
         self.img.fig_draw_points(ax, points)
-        # self.img.draw_hemi(ax, HEMISPHERE_NUM, self.slice_width)
+        self.img.draw_hemi(ax, HEMISPHERE_NUM, self.slice_width)
         plt.show()
 
     def show_lines(self, lines, title="lines"):
@@ -879,7 +889,7 @@ class ColorRemover:
             ax = fig.add_subplot(111, projection="3d", title=title)
             self.img.fig_set_label(ax)
             print line
-            # self.img.fig_draw_lines(ax, [line, ])
+            # self._img.fig_draw_lines(ax, [line, ])
             self.img.fig_draw_points(ax, self.points_of_hough_line_in_sphere[line])
             plt.show()
 
@@ -895,7 +905,36 @@ class ColorRemover:
         fn = dir_name+"/colorregion"+str(num)+".bmp"
         cv2.imwrite(fn, img)
 
-    def project_to_sphere(self):
+    def km_houg_lines(self, hough_lines):
+        # hough_lines:(A, B, C, x1, y1, x2, y2)
+        # k-means to cluster lines
+        merged_lines = []
+        descriptors = map(lambda line: line[1:3], hough_lines)
+        descriptors = np.array(descriptors)
+        # initial k-m
+        km = KMeans(n_clusters=NUM_OF_HOUGH_LINE, max_iter=600)
+        # apply k-m
+        labels = km.fit_predict(descriptors)
+        labels_set = set(labels)
+        labels_arr = np.array(labels)
+        hough_lines_arr = np.array(hough_lines)
+        for label in labels_set:
+            lines = hough_lines_arr[labels_arr == label]
+            if len(lines) < 2:
+                merged_lines.append(lines[0])
+                continue
+            # merged line
+            max_len = 0
+            max_line = lines[0]
+            for line in lines:
+                x1, y1, x2, y2 = line[-4:]
+                length = np.power(y2-y1, 2)+np.power(x2-x1, 2)
+                if length > max_len:
+                    max_line = line
+            merged_lines.append(max_line)
+        return merged_lines
+
+    def generate_hough_line(self):
         def cvt_polar(point):
             x, y, z = point
             p = np.array(np.float32(point))
@@ -920,58 +959,85 @@ class ColorRemover:
             # init vars
             # pixels and points that is with a position on sphere
             # used for clustering
-
             # one point(angle of polar coordinate) on sphere corresponding to some pixels/points
-            self.pixels_of_angle_in_sphere[sphere] = {}
-            self.points_of_angle_in_sphere[sphere] = {}
-
-            self.hough_spheres[sphere] = np.zeros((400, 400, 3), dtype=np.uint8) # for show
-            self.sphere_maps[sphere] = np.zeros((400, 400), dtype=np.uint8) # for HT
 
             # result for clustering RGB points to hough lines.
             self.points_of_hough_line_in_sphere[sphere] = {}
             self.hough_line_of_point_in_sphere[sphere] = {}
 
-            for pixel in self.img.fg_pixels:
-                point = self.img.get_bgr_value(pixel)
-                pb, pg, pr = point
-                # move axis
-                if "r" == sphere:
-                    point = (pb, pg, pr+50)
-                if "g" == sphere:
-                    point = (pb, pg+50, pr)
-                if "b" == sphere:
-                    point = (pb+50, pg, pr)
+            self.pixels_of_angle_in_sphere[sphere] = {}
+            self.points_of_angle_in_sphere[sphere] = {}
+            self.hough_spheres[sphere] = np.zeros((400, 400, 3), dtype=np.uint8) # for show
+            self.sphere_maps[sphere] = np.zeros((400, 400), dtype=np.uint8) # for HT
 
-                # polar coordinate
-                a, b = cvt_polar(point)
-                self.pixels_of_angle_in_sphere[sphere][(a, b)] = \
-                    self.pixels_of_angle_in_sphere[sphere].get((a, b), []) + [pixel]
-                self.points_of_angle_in_sphere[sphere][(a, b)] = \
-                    self.points_of_angle_in_sphere[sphere].get((a, b), []) + [self.img.get_bgr_value(pixel)]
-                self.sphere_maps[sphere].itemset((b, a), 255)
-                self.hough_spheres[sphere].itemset((b, a, 0), 255)
-                self.hough_spheres[sphere].itemset((b, a, 1), 255)
-                self.hough_spheres[sphere].itemset((b, a, 2), 255)
+            if sphere in ["r", "g", "b", "rgb"]:
+                for pixel in self.img.fg_pixels:
+                    point = self.img.get_bgr_value(pixel)
+                    pb, pg, pr = point
+                    # move axis
+                    if "r" == sphere:
+                        point = (pb, pg, pr+50)
+                    if "g" == sphere:
+                        point = (pb, pg+50, pr)
+                    if "b" == sphere:
+                        point = (pb+50, pg, pr)
+
+                    # polar coordinate
+                    a, b = cvt_polar(point)
+                    self.pixels_of_angle_in_sphere[sphere][(a, b)] = \
+                        self.pixels_of_angle_in_sphere[sphere].get((a, b), []) + [pixel]
+                    self.points_of_angle_in_sphere[sphere][(a, b)] = \
+                        self.points_of_angle_in_sphere[sphere].get((a, b), []) + [self.img.get_bgr_value(pixel)]
+                    self.sphere_maps[sphere].itemset((b, a), 255)
+                    self.hough_spheres[sphere].itemset((b, a, 0), 255)
+                    self.hough_spheres[sphere].itemset((b, a, 1), 255)
+                    self.hough_spheres[sphere].itemset((b, a, 2), 255)
+            if sphere in ["rg", "rb", "gb"]:
+                for pixel in self.img.fg_pixels:
+                    point = self.img.get_bgr_value(pixel)
+                    pb, pg, pr = point
+                    # project points to plane
+                    if "rg" == sphere:
+                        a, b = (pr, pg)
+                    if "gb" == sphere:
+                        a, b = (pg, pb)
+                    if "rb" == sphere:
+                        a, b = (pr, pb)
+
+                    self.pixels_of_angle_in_sphere[sphere][(a, b)] = \
+                        self.pixels_of_angle_in_sphere[sphere].get((a, b), []) + [pixel]
+                    self.points_of_angle_in_sphere[sphere][(a, b)] = \
+                        self.points_of_angle_in_sphere[sphere].get((a, b), []) + [self.img.get_bgr_value(pixel)]
+                    self.sphere_maps[sphere].itemset((b, a), 255)
+                    self.hough_spheres[sphere].itemset((b, a, 0), 255)
+                    self.hough_spheres[sphere].itemset((b, a, 1), 255)
+                    self.hough_spheres[sphere].itemset((b, a, 2), 255)
 
             # do hough transform and generate hough lines
             hough_lines_sphere = []
             cv2.imshow("hough_sphere_" + sphere, self.hough_spheres[sphere])
             cv2.waitKey()
             sp_map = np.copy(self.hough_spheres[sphere])
-            lines = cv2.HoughLinesP(self.sphere_maps[sphere], 1, np.pi/180, 45, maxLineGap=50)[0]
+            lines = cv2.HoughLinesP(self.sphere_maps[sphere], 1, np.pi/180, 60, maxLineGap=50)[0]
             i = 0
             for x1, y1, x2, y2 in lines:
+                # line: Ax+By+C=0
+                A0 = y2-y1 if y2 != y1 else 0.0001
+                A = 1.0
+                B = (x1-x2)/float(A0)
+                C = (x2*y1-x1*y2)/(x2-x1)/float(A0)
+                hough_lines_sphere.append((A, B, C, x1, y1, x2, y2))
+
+            if len(hough_lines_sphere) > NUM_OF_HOUGH_LINE:
+                hough_lines_sphere = self.km_houg_lines(hough_lines_sphere)
+
+            for a, b, c, x1, y1, x2, y2 in hough_lines_sphere:
                 color = [0, 0, 0]
                 color[i % 3] = 255
                 i += 1
                 color = tuple(color)
-                # line: Ax+By+C=0
-                A = y2-y1
-                B = x1-x2
-                C = x2*y1-x1*y2
-                hough_lines_sphere.append((A, B, C, x1, y1, x2, y2))
-                cv2.line(sp_map, (x1, y1), (x2, y2), color, 2)
+                cv2.line(sp_map, (int(x1), int(y1)), (int(x2), int(y2)), color, 2)
+
             cv2.imshow("hough lines", sp_map)
             cv2.waitKey()
 
@@ -979,25 +1045,11 @@ class ColorRemover:
             for angle_a, angle_b in self.pixels_of_angle_in_sphere[sphere]:
                 min_dist = 360*360*2
                 min_line = hough_lines_sphere[0]
-                find = False
                 for A, B, C, x1, y1, x2, y2 in hough_lines_sphere:
-                    x1, x2 = (x1, x2) if x1 < x2 else (x2, x1)
-                    y1, y2 = (y1, y2) if y1 < y2 else (y2, y1)
-                    if not (x1 < angle_a < x2 and y1 < angle_b < y2):
-                        continue
-                    find = True
                     dist = np.power(A*angle_a+B*angle_b+C, 2)/(A*A+B*B)
                     if dist <= min_dist:
                         min_dist = dist
-                        min_line = (A, B, C)
-                if not find:
-                    for A, B, C, x1, y1, x2, y2 in hough_lines_sphere:
-                        x0 = (x1+x2)/2.0
-                        y0 = (y1+y2)/2.0
-                        dist = np.power((angle_a-x0,), 2) + np.power((angle_b-y0), 2)
-                        if dist <= min_dist:
-                            min_dist = dist
-                            min_line = (A, B, C)
+                        min_line = (B, C)
 
                 piexls = self.pixels_of_angle_in_sphere[sphere][(angle_a, angle_b)]
                 self.points_of_hough_line_in_sphere[sphere][min_line] = \
@@ -1007,26 +1059,21 @@ class ColorRemover:
                     self.hough_line_of_point_in_sphere[sphere][point] = min_line
 
         # merge the results of cluster
-        # for hl in self.points_of_hough_line_in_sphere["rgb"]:
-        #     for hl_r in self.points_of_hough_line_in_sphere["r"]:
-        #         for hl_g in self.points_of_hough_line_in_sphere["g"]:
-        #             for hl_b in self.points_of_hough_line_in_sphere["b"]:
-        #                 label = (hl, hl_r, hl_g, hl_b)
-        #                 points = set(self.points_of_hough_line_in_sphere["rgb"][hl]) &\
-        #                     set(self.points_of_hough_line_in_sphere["r"][hl_r]) &\
-        #                     set(self.points_of_hough_line_in_sphere["g"][hl_g]) &\
-        #                     set(self.points_of_hough_line_in_sphere["b"][hl_b])
-        #                 self.points_of_hough_line[label] = points
         for pixel in self.img.fg_pixels:
             point = self.img.get_bgr_value(pixel)
-            lines = tuple(self.hough_line_of_point_in_sphere[sp][point] for sp in self.hough_line_of_point_in_sphere)
+            # lines = tuple(self.hough_line_of_point_in_sphere[sp][point] for sp in self.hough_line_of_point_in_sphere)
+            lines = []
+            for sp in self.hough_line_of_point_in_sphere:
+                line = self.hough_line_of_point_in_sphere[sp][point]
+                lines += list(line)
+            lines = tuple(lines)
             self.hough_lines_of_point[point] = lines
             self.points_of_hough_line[lines] = self.points_of_hough_line.get(lines, ()) + (point,)
             self.pixels_of_hough_line[lines] = self.pixels_of_hough_line.get(lines, ()) + (pixel,)
 
     def main_process_of_color_line_sphere_hough(self):
         print "Projecting pixels to sphere...",
-        self.project_to_sphere()
+        self.generate_hough_line()
         print "done"
 
         # self.show_cluster_points_hough_1()
@@ -1066,13 +1113,22 @@ class ColorRemover:
         print "done"
 
 if __name__ == "__main__":
-    files = ["img/man.bmp", "img/bird.bmp", "img/nasu.bmp"]
-    # files = ["img/bird.bmp"]
+    files = [
+        # "_img/man.bmp",
+        # "_img/bird.bmp",
+        # "_img/nasu.bmp",
+        # "_img/teapot.png",
+        # "_img/teapot0.png",
+        # "_img/sp5080.png",
+        # "_img/sp6.png",
+        "img/cylinder.jpg"
+    ]
+    # files = ["_img/bird.bmp"]
     for file in files:
         cr = ColorRemover(file)
         # cr.cluster_pixels()
         cr.show_bgr_histogram()
         cr.main_process_of_color_line_sphere_hough()
         # cv2.imshow("result gray r", cr.gray_after_adjust)
-        # cv2.imshow("gray", cr.img.gray)
+        # cv2.imshow("gray", cr._img.gray)
         # cv2.waitKey()
