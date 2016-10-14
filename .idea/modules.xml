@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/hough_transform_color_removal.iml" filepath="$PROJECT_DIR$/.idea/hough_transform_color_removal.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/color_line_0829.iml" filepath="$PROJECT_DIR$/.idea/color_line_0829.iml" />
     </modules>
   </component>
 </project>

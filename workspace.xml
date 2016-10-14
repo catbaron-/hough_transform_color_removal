@@ -2,31 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="908aecf0-52be-4a01-a9ea-a2babc97f55f" name="Default" comment="">
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/sphere_hough_input_img/sphere_2color/colorregion0.bmp" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/sphere_hough_input_img/sphere_2color/colorregion1.bmp" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/sphere_hough_input_img/sphere_2color/colorregion10.bmp" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/sphere_hough_input_img/sphere_2color/colorregion11.bmp" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/sphere_hough_input_img/sphere_2color/colorregion12.bmp" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/sphere_hough_input_img/sphere_2color/colorregion13.bmp" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/sphere_hough_input_img/sphere_2color/colorregion14.bmp" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/sphere_hough_input_img/sphere_2color/colorregion15.bmp" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/sphere_hough_input_img/sphere_2color/colorregion16.bmp" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/sphere_hough_input_img/sphere_2color/colorregion17.bmp" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/sphere_hough_input_img/sphere_2color/colorregion18.bmp" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/sphere_hough_input_img/sphere_2color/colorregion19.bmp" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/sphere_hough_input_img/sphere_2color/colorregion2.bmp" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/sphere_hough_input_img/sphere_2color/colorregion3.bmp" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/sphere_hough_input_img/sphere_2color/colorregion4.bmp" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/sphere_hough_input_img/sphere_2color/colorregion5.bmp" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/sphere_hough_input_img/sphere_2color/colorregion6.bmp" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/sphere_hough_input_img/sphere_2color/colorregion7.bmp" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/sphere_hough_input_img/sphere_2color/colorregion8.bmp" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/sphere_hough_input_img/sphere_2color/colorregion9.bmp" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/input_img/sphere_2color.png" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/.idea/.name" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/hist.py" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/ransac.py" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/ransac_test.py" />
+      <change type="DELETED" beforePath="C:\Users\wtq\PycharmProjects\hough_transform_color_removal\basicimage.py" afterPath="" />
       <change type="DELETED" beforePath="C:\Users\wtq\PycharmProjects\hough_transform_color_removal\img\adjust.png" afterPath="" />
       <change type="DELETED" beforePath="C:\Users\wtq\PycharmProjects\hough_transform_color_removal\img\bird.bmp" afterPath="" />
       <change type="DELETED" beforePath="C:\Users\wtq\PycharmProjects\hough_transform_color_removal\img\boy.bmp" afterPath="" />
@@ -55,13 +31,7 @@
       <change type="DELETED" beforePath="C:\Users\wtq\PycharmProjects\hough_transform_color_removal\img\teapot.png" afterPath="" />
       <change type="DELETED" beforePath="C:\Users\wtq\PycharmProjects\hough_transform_color_removal\img\teapot0.png" afterPath="" />
       <change type="DELETED" beforePath="C:\Users\wtq\PycharmProjects\hough_transform_color_removal\img\ym.bmp" afterPath="" />
-      <change type="MOVED" beforePath="C:\Users\wtq\PycharmProjects\hough_transform_color_removal\.idea\hough_transform_color_removal.iml" afterPath="$PROJECT_DIR$/.idea/color_line_0829.iml" />
-      <change type="MOVED" beforePath="C:\Users\wtq\PycharmProjects\hough_transform_color_removal\.idea\workspace.xml" afterPath="$PROJECT_DIR$/workspace.xml" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/basicimage.py" afterPath="$PROJECT_DIR$/basicimage.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/main.py" afterPath="$PROJECT_DIR$/main.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/misc.xml" afterPath="$PROJECT_DIR$/.idea/misc.xml" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/modules.xml" afterPath="$PROJECT_DIR$/.idea/modules.xml" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/vcs.xml" afterPath="$PROJECT_DIR$/.idea/vcs.xml" />
+      <change type="DELETED" beforePath="C:\Users\wtq\PycharmProjects\hough_transform_color_removal\main.py" afterPath="" />
     </list>
     <ignored path="hough_transform_color_removal.iws" />
     <ignored path=".idea/workspace.xml" />
@@ -101,11 +71,8 @@
     <OptionsSetting value="true" id="Update" />
     <OptionsSetting value="true" id="Status" />
     <OptionsSetting value="true" id="Edit" />
-    <ConfirmationsSetting value="2" id="Add" />
+    <ConfirmationsSetting value="0" id="Add" />
     <ConfirmationsSetting value="0" id="Remove" />
-  </component>
-  <component name="ProjectReloadState">
-    <option name="STATE" value="1" />
   </component>
   <component name="ProjectView">
     <navigator currentView="Scope" currentSubView="Project Files" proportions="" version="1">
@@ -120,6 +87,10 @@
       <sortByType />
     </navigator>
     <panes>
+      <pane id="Scratches" />
+      <pane id="Scope">
+        <subPane subId="Project Files" />
+      </pane>
       <pane id="ProjectPane">
         <subPane>
           <PATH>
@@ -130,21 +101,6 @@
           </PATH>
         </subPane>
       </pane>
-      <pane id="Scope">
-        <subPane subId="Project Files">
-          <PATH>
-            <PATH_ELEMENT USER_OBJECT="Root">
-              <option name="myItemId" value="" />
-              <option name="myItemType" value="" />
-            </PATH_ELEMENT>
-            <PATH_ELEMENT USER_OBJECT="hough_transform_color_removal">
-              <option name="myItemId" value="" />
-              <option name="myItemType" value="" />
-            </PATH_ELEMENT>
-          </PATH>
-        </subPane>
-      </pane>
-      <pane id="Scratches" />
     </panes>
   </component>
   <component name="PropertiesComponent">
@@ -154,12 +110,6 @@
   </component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
-      <recent name="C:\Users\wtq\PycharmProjects\hough_transform_color_removal\sphere_hough_input_img" />
-      <recent name="C:\Users\wtq\PycharmProjects\hough_transform_color_removal\.idea" />
-      <recent name="C:\Users\wtq\PycharmProjects\hough_transform_color_removal" />
-    </key>
-    <key name="MoveFile.RECENT_KEYS">
-      <recent name="C:\Users\wtq\PycharmProjects\hough_transform_color_removal\.idea" />
       <recent name="C:\Users\wtq\PycharmProjects\hough_transform_color_removal" />
     </key>
   </component>
@@ -317,19 +267,19 @@
       <window_info id="Application Servers" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Python Console" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
-      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Favorites" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="2" side_tool="true" content_ui="tabs" />
-      <window_info id="Debug" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.4" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="Cvs" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.25" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
       <window_info id="Messages" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Message" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
       <window_info id="Commander" active="false" anchor="right" auto_hide="false" internal_type="SLIDING" type="SLIDING" visible="false" weight="0.4" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
       <window_info id="Inspection" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.4" sideWeight="0.5" order="5" side_tool="false" content_ui="tabs" />
+      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Hierarchy" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.25" sideWeight="0.5" order="2" side_tool="false" content_ui="combo" />
       <window_info id="Find" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Ant Build" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
+      <window_info id="Debug" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.4" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
     </layout>
   </component>
   <component name="VcsContentAnnotationSettings">

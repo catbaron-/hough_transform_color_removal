@@ -11,16 +11,19 @@ class Input:
 
     def __init__(self, img_name):
         # read image
+        # if img_name is a string, create new instance; else if it's an object, copy it
         if isinstance(img_name, str):
-            print("Reading img file '" + img_name + "'...\n")
+            print("Reading _img file '" + img_name + "'...\n")
             self.img_name = img_name.split(".")[0]
             self.img = cv2.imread("./" + img_name)
-        else:
+        elif isinstance(img_name, Input):
             self.img = img_name.copy()
+        else:
+            print("Illegle parameter!")
+            return
         self.rows, self.cols, dim = self.img.shape
         cols = self.cols
         rows = self.rows
-
 
         # RGB scale
         self.bgr = self.img
@@ -29,18 +32,14 @@ class Input:
         # hsl scale
         self.hls = cv2.cvtColor(self.img, cv2.COLOR_BGR2HLS)
 
-        # location list for all pixels
-        self.pixels_points = {}
-        self.points_pixels = {}
-        self.points_norms = {}
-        for pixel in [(r, c) for r in range(self.rows) for c in range(self.cols)]:
-            point = self.get_bgr_value(pixel)
-            self.pixels_points[pixel] = point
-            if point not in self.points_pixels:
-                self.points_pixels[point] = [pixel]
-                self.points_norms[point] = self.get_bgr_norm(point)
-            else:
-                self.points_pixels[point].append(pixel)
+        # some correspondances
+        # self.pixels_points = {}  # pixel:point
+        # self.points_pixels = {}  # point:pixels
+        self.points_norms = {}   # point:norm
+
+        # some type of pixles
+        self.pixels = {}
+        self.points = {}
         self.fg_pixels = {}
         self.bg_pixels = {}
         self.fg_points = {}
@@ -51,23 +50,21 @@ class Input:
         self.fg_map_show = self.fg_map.copy()
 
         # generate fg_map
-        for pixel in self.pixels_points:
-            blue, green, red = self.get_bgr_value(pixel)
-            if blue >= 250 and green >= 250 and red >= 250:
+        for pixel in [(r, c) for r in range(self.rows) for c in range(self.cols)]:
+            blue, green, red = point = self.get_bgr_value(pixel)
+            if point not in self.points_norms:
+                self.points_norms[point] = self.get_bgr_norm(point)
+
+            self.pixels[pixel] = 1
+            self.points[point] = 1
+            if blue >= 250 and green >= 250 and red >= 250:  # or blue < 5 and green < 5 and red < 5:
                 self.fg_map.itemset(pixel, 0)
                 self.fg_map_show.itemset(pixel, 0)
-            else:
-                self.fg_map.itemset(pixel, 1)
-                self.fg_map_show.itemset(pixel, 255)
-
-        print "Doing Segmentation..."
-        # pixels of #FFF is background, labeled as 0
-        for pixel in self.pixels_points:
-            b, g, r = point = self.get_bgr_value(pixel)
-            if b >= 253 and g >= 253 and r >= 253:
                 self.bg_pixels[pixel] = "1"
                 self.bg_points[point] = "1"
             else:
+                self.fg_map.itemset(pixel, 1)
+                self.fg_map_show.itemset(pixel, 255)
                 self.fg_pixels[pixel] = "1"
                 self.fg_points[point] = "1"
 
@@ -102,13 +99,28 @@ class Input:
         else:
             return False
 
+    def resize_fg_gray(self, img):
+        gray_xs, gray_ys = zip(*self.fg_pixels.keys())
+        x_max = max(gray_xs)
+        y_max = max(gray_ys)
+        x_min = min(gray_xs)
+        y_min = min(gray_ys)
+        # new_img = np.zeros((x_max-x_min+1, y_max-y_min+1), dtype=np.uint8)
+        new_img = np.array([255]*(x_max-x_min+1)*(y_max-y_min+1), dtype=np.uint8).reshape((x_max-x_min+1, y_max-y_min+1))
+        for p in self.fg_pixels:
+            x, y = p
+            x = x - x_min
+            y = y - y_min
+            new_img.itemset((x, y), img.item(p))
+        return new_img
+
     def show_fg(self):
         cv2.imshow(self.img_name + "_fg", self.fg_map_show)
 
     @staticmethod
-    def draw_hemi(ax, slice_number, slice_width):
+    def draw_hemi(ax, slice_number, slice_width, slice_start_norm):
         for i in range(slice_number):
-            r = slice_width * (i + 1)
+            r = slice_width * i + slice_start_norm
             x = np.arange(0, r, r / 10)
             y = np.arange(0, r, r / 10)
             # z = np.sqrt(np.add(np.multiply(x, x), np.multiply(y, y)))
@@ -137,8 +149,11 @@ class Input:
     def fig_draw_points(ax, points, cmap=None):
         if points:
             b, g, r = zip(*points)
-            if cmap == None:
-                color_map = map(lambda x: map(lambda y: y / float(255) if 255 > y > 0 else 1, x), points)
+            points_rgb = zip(r, g, b)
+            if cmap is None:
+                color_map = map(lambda x: map(lambda y: y / float(255) if 255 >= y >= 0 else 1, x), points_rgb)
+                # bs, gs, rs = color_map
+                # color_map = [rs, gs, bs]
             else:
                 color_map = cmap
             ax.scatter(b, g, r, s=30, c=color_map, marker="o", edgecolors='None')
