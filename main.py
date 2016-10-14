@@ -247,8 +247,8 @@ class ColorRemover:
             return 1
         edge_pixels = self.pixel_edges[color_line][to_color_line]
         # calculate the linear of the edge pixels
-        points, to_points = [], []
-
+        points, to_points = {'r': [], 'g': [], 'b': []}, {'r': [], 'g': [], 'b': []}
+        # TODO: code to calculate k, b for rgh
         for pixel, to_pixel in edge_pixels:
             points += self.img.get_bgr_value(pixel)
             to_points += self.img.get_bgr_value(to_pixel, self.img_after_adjust)
@@ -373,7 +373,10 @@ class ColorRemover:
         ])
 
         # start to adjust
+        # TODO: generate k, b for rgb respectively.
         k, b = 1, norm_back
+        kr, kg, kb = 1, 1, 1
+        br, bg, bb = norm_back, norm_back, norm_back
 
         for pixel in self.pixels_of_color_line[color_line]:
             blue, green, red = self.img.get_bgr_value(pixel)
