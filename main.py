@@ -17,7 +17,7 @@ IMAGE = "input_img/sphere_2color.png"
 LOCAL = False
 LOCAL = True
 QUANTILE = 0.25
-HOUGH_VOTE = 20
+HOUGH_VOTE = 5
 NUM_OF_HOUGH_LINE = 3
 VECTOR_DIMENSION = 36
 K_ = 5
@@ -199,31 +199,6 @@ class ColorRemover:
                     continue
                 pixel = p
                 neighbor_pixel = q
-                # p,q are edge pixels
-                # qq = (pixel_x + x + x, pixel_y + y + y)
-                # pp = (pixel_x - x, pixel_y - y)
-                # if pp in self.pixels_of_color_line[color_line]:
-                #     point_pp = self.img.get_bgr_value(pp)
-                #     norm_pp = self.img.get_bgr_norm(point_pp)
-                #     if norm_pp == 0:
-                #         pp = None
-                # else:
-                #     pp = None
-                #
-                # if qq in self.pixels_of_color_line[neighbor_color_line]:
-                #     point_qq = self.img.get_bgr_value(qq)
-                #     norm_qq = self.img.get_bgr_norm(point_qq)
-                #     if norm_qq == 0:
-                #         qq = None
-                # else:
-                #     qq = None
-                #
-                # if pp and qq:
-                #     pixel = pp
-                #     neighbor_pixel = qq
-                # else:
-                #     pixel = p
-                #     neighbor_pixel = q
 
                 if color_line not in self.pixel_edges:
                     self.pixel_edges[color_line] = {neighbor_color_line: [(pixel, neighbor_pixel)]}
@@ -247,40 +222,45 @@ class ColorRemover:
             return 1
         edge_pixels = self.pixel_edges[color_line][to_color_line]
         # calculate the linear of the edge pixels
-        points, to_points = {'r': [], 'g': [], 'b': []}, {'r': [], 'g': [], 'b': []}
-        # TODO: code to calculate k, b for rgh
+        points, to_points = [], []
         for pixel, to_pixel in edge_pixels:
+            # the pixels has been updated by the transform matrix
             points += self.img.get_bgr_value(pixel)
             to_points += self.img.get_bgr_value(to_pixel, self.img_after_adjust)
-            # points.append(self.img.get_bgr_value(pixel, self.img_after_adjust)[1])
-            # to_points.append(self.img_after_adjust.item((x, y, 1)))
 
-        # generate hough lines
+        # points = zip(*points)   # [(r...), (g...), (b...)]
+        # to_points = zip(*to_points)  # [(r...), (g...), (b...)]
+
+        # generate hough lines for r, g, b
         hough_points = zip(points, to_points)
         hough_convas = np.zeros((400, 400), dtype=np.uint8)
         hough_convas_3 = np.zeros((400, 400, 3), dtype=np.uint8)
-        print hough_points
+        # c = 0
         for p in hough_points:
+            # if c > 100:
+            #     break
+            # c += 1
             x, y = map(int, p)
-            if  0 < p[0] < 255 and 1 < p[1] < 255:
+            if 0 < p[0] < 255 and 1 < p[1] < 255:
                 hough_convas.itemset((x, y), 255)
-                cv2.imshow("hough edge", hough_convas)
-                cv2.waitKey()
-        lines = cv2.HoughLinesP(hough_convas, 1, np.pi/180, HOUGH_VOTE, maxLineGap=100)[0]
+                # cv2.imshow("hough edge", hough_convas)
+                # cv2.waitKey()
+        hough_lines = cv2.HoughLinesP(hough_convas, 1, np.pi/180, HOUGH_VOTE, maxLineGap=100)[0]
+        # hough_lines.append(lines)
 
         # calculate k and b
-        ks = []
-        bs = []
-        for (x1, y1, x2, y2) in lines:
+        ks, bs = [], []
+        for (x1, y1, x2, y2) in hough_lines:
             if x1 == x2:
                 continue
-            color = [random.randint(10, 255), random.randint(100, 255), random.randint(1, 255)]
-            cv2.line(hough_convas_3, (int(x1), int(y1)), (int(x2), int(y2)), color, 3)
-
-            ks.append((y2-y1)/float(x2-x1))
-            bs.append(y1 - ks[-1]*x1)
-        cv2.imshow("hough_lines", hough_convas_3)
-        cv2.waitKey()
+            ks.append((y2 - y1) / float(x2 - x1))
+            bs.append(y1 - ks[-1] * x1)
+            # show the lines
+            # color = [random.randint(10, 255), random.randint(100, 255), random.randint(1, 255)]
+            # cv2.line(hough_convas_3, (int(x1), int(y1)), (int(x2), int(y2)), color, 3)
+        # cv2.imshow("hough_lines", hough_convas_3)
+        # cv2.waitKey()
+        print "ks, bs", ks, bs
         k = sum(ks)/len(ks)
         b = sum(bs)/len(bs)
         return k, b
@@ -373,25 +353,19 @@ class ColorRemover:
         ])
 
         # start to adjust
-        # TODO: generate k, b for rgb respectively.
         k, b = 1, norm_back
-        kr, kg, kb = 1, 1, 1
-        br, bg, bb = norm_back, norm_back, norm_back
-
+        print "transform in matrix:"
         for pixel in self.pixels_of_color_line[color_line]:
             blue, green, red = self.img.get_bgr_value(pixel)
-            print red, green, blue, "-",
-
             # move to origin
             red -= np.float(r_p0)
             green -= np.float(g_p0)
             blue -= np.float(b_p0)
-            print red, green, blue, "-",
             # rotate to x=y=z
             blue, green, red = map(lambda a: a.item(0, 0), matrix_z0 * np.matrix([[blue], [green], [red]]))
             blue, green, red = map(lambda a: a.item(0, 0), matrix_y * np.matrix([[blue], [green], [red]]))
             blue, green, red = map(lambda a: a.item(0, 0), matrix_z1 * np.matrix([[blue], [green], [red]]))
-            print red, green, blue
+
             x, y = pixel
             self.img_after_adjust.itemset((x, y, 0), blue)
             self.img_after_adjust.itemset((x, y, 1), green)
@@ -399,12 +373,18 @@ class ColorRemover:
 
         if merge_to:
             # adjust length of color line
+            # TODO: k and s are not good enough, fix it.
+            # TODO: show the process of each stean during the adjustment
             k, b = self.calculate_kb(color_line, merge_to)
-        print "k, b:", k, b
+
         for pixel in self.pixels_of_color_line[color_line]:
+            # blue, green, red = self.img.get_bgr_value(pixel, self.img_after_adjust)
+            # blue = blue*kb + bb
+            # green = green * kg + bg
+            # red = red * kr + br
             blue, green, red = map(lambda v: v*k+b, self.img.get_bgr_value(pixel, self.img_after_adjust))
             x, y = pixel
-            print red, green, blue
+            # print blue, green, red
             self.img_after_adjust.itemset((x, y, 0), blue)
             self.img_after_adjust.itemset((x, y, 1), green)
             self.img_after_adjust.itemset((x, y, 2), red)
@@ -456,7 +436,7 @@ class ColorRemover:
         return cv2.cvtColor(self.adjusted_img, cv2.COLOR_RGB2GRAY, self.gray_after_adjust)
 
     def show_lines_points(self, lines, points, title="lines & points"):
-        fig = plt.figure()
+        fig = plt.figure(frameon=False)
         ax = fig.add_subplot(111, projection="3d", title=title)
         self.img.fig_set_label(ax)
         self.img.fig_draw_lines(ax, lines)
@@ -465,7 +445,7 @@ class ColorRemover:
         plt.show()
 
     def show_lines(self, lines, title="lines"):
-        fig = plt.figure()
+        fig = plt.figure(frameon=False)
         ax = fig.add_subplot(111, projection="3d", title=title)
         self.img.fig_set_label(ax)
         self.img.fig_draw_lines(ax, lines)
@@ -473,7 +453,7 @@ class ColorRemover:
         plt.show()
 
     def show_points(self, points, title="points"):
-        fig = plt.figure()
+        fig = plt.figure(frameon=False)
         ax = fig.add_subplot(111, projection="3d", title=title)
         self.img.fig_set_label(ax)
         points = set(map(lambda x: tuple(x), points))
@@ -481,7 +461,7 @@ class ColorRemover:
         # self.img.draw_hemi(ax, HEMISPHERE_NUM, self.slice_width)
 
     def show_points_2(self, points1, points2, title1="points1", title2="points2"):
-        fig = plt.figure()
+        fig = plt.figure(frameon=False)
         ax1 = fig.add_subplot(121, projection="3d", title=title1)
         self.img.fig_set_label(ax1)
         points1 = set(map(lambda x: tuple(x), points1))
@@ -496,7 +476,7 @@ class ColorRemover:
         plt.show()
 
     def show_bgr_histogram(self):
-        fig = plt.figure()
+        fig = plt.figure(frameon=False)
         ax = fig.add_subplot(111, projection="3d", title="BGR Histogram")
         self.img.fig_set_label(ax)
         points = map(lambda x: tuple(x), self.img.points.keys())
@@ -507,7 +487,7 @@ class ColorRemover:
     def show_histogram_of_mat(self, mat, title="Mat Histogram", limit=300):
         mat_ = mat.reshape((1, mat.size/3, 3))
         points = map(lambda x: tuple(x), mat_[0])
-        fig = plt.figure()
+        fig = plt.figure(frameon=False)
         ax = fig.add_subplot(111, projection="3d", title=title)
         self.img.fig_set_label(ax, limit=limit)
         points = set(points)
@@ -515,7 +495,7 @@ class ColorRemover:
         plt.show()
 
     def show_label_points(self):
-        fig = plt.figure()
+        fig = plt.figure(frameon=False)
         ax = fig.add_subplot(111, projection="3d", title="segments")
         self.img.fig_set_label(ax, limit=300)
         for label in self.cluster_bgr:
@@ -526,7 +506,7 @@ class ColorRemover:
 
     def show_label_points_1(self):
         for label in self.cluster_bgr:
-            fig = plt.figure()
+            fig = plt.figure(frameon=False)
             ax = fig.add_subplot(111, projection="3d", title="segments")
             self.img.fig_set_label(ax, limit=300)
             points = set(self.cluster_bgr[label])
@@ -538,7 +518,7 @@ class ColorRemover:
 
     def show_cluster_points_1(self, title="points of line"):
         for line in self.points_of_color_line:
-            fig = plt.figure()
+            fig = plt.figure(frameon=False)
             ax = fig.add_subplot(111, projection="3d", title=title)
             self.img.fig_set_label(ax)
             print line
@@ -548,7 +528,7 @@ class ColorRemover:
 
     def show_cluster_points_hough_1(self, title="points of hough line"):
         for line in self.points_of_hough_line_in_sphere:
-            fig = plt.figure()
+            fig = plt.figure(frameon=False)
             ax = fig.add_subplot(111, projection="3d", title=title)
             self.img.fig_set_label(ax)
             print line
@@ -723,7 +703,7 @@ class ColorRemover:
                 i += 1
                 color = tuple(color)
                 cv2.line(sp_map, (int(x1), int(y1)), (int(x2), int(y2)), color, 3)
-                print "hough lines:", (a, b, c)
+                # print "hough lines:", (a, b, c)
 
             # cv2.imshow("hough lines " + sphere, sp_map)
             # cv2.waitKey()
@@ -844,9 +824,9 @@ class ColorRemover:
         self.adjust_color()
         dir_name = DIR_NAME + self.img.img_name
         cv2.imwrite(dir_name+"/result.bmp", self.gray_after_adjust)
-        # cv2.imshow("result", self.gray_after_adjust)
+        cv2.imshow("result", self.gray_after_adjust)
         # self.show_histogram_of_mat(self.gray_after_adjust, "result")
-        # cv2.waitKey()
+        cv2.waitKey()
         # print self.calculate_difference()
         print "done"
 
@@ -925,7 +905,7 @@ class ColorRemover:
         hist_result = resized_result[resized_result<255]
         hist_gray = resized_gray[resized_gray<255]
 
-        plt.figure()
+        plt.figure(frameon=False)
         plt.xlim(0, 255)
         n, bins, patches = plt.hist(hist_truth, 40, normed=1, alpha=0.75)
         plt.title('Histogram of truth')
@@ -933,7 +913,7 @@ class ColorRemover:
         plt.ylabel('percent')
         plt.show()
 
-        plt.figure()
+        plt.figure(frameon=False)
         plt.xlim(0, 255)
         n, bins, patches = plt.hist(hist_result, 40, normed=1, alpha=0.75)
         plt.title('Histogram of result')
@@ -941,7 +921,7 @@ class ColorRemover:
         plt.ylabel('percent')
         plt.show()
 
-        plt.figure()
+        plt.figure(frameon=False)
         plt.xlim(0, 255)
         n, bins, patches = plt.hist(hist_gray, 40, normed=1, alpha=0.75)
         plt.title('Histogram of gray')
@@ -949,7 +929,7 @@ class ColorRemover:
         plt.ylabel('percent')
         plt.show()
 
-        plt.figure()
+        plt.figure(frameon=False)
         plt.xlim(-255, 255)
         n, bins, patches = plt.hist(diff_result, 40, normed=1, alpha=0.75)
         plt.title('Histogram of difference between result and truth')
@@ -957,7 +937,6 @@ class ColorRemover:
         plt.ylabel('percent')
         plt.show()
 
-        plt.figure()
         plt.xlim(-255, 255)
         n, bins, patches = plt.hist(diff_gray, 40, normed=1, alpha=0.75)
         plt.title('Histogram of difference between linear luminance and truth')
