@@ -13,11 +13,11 @@ __author__ = 'wtq'
 # including 3 planes and 4 spheres
 # coding=utf-8
 # IMAGE = "input_img/teapot_ss.png"
-IMAGE = "input_img/sphere_2color.png"
+IMAGE = "input_img/sp6.png"
 LOCAL = False
 # LOCAL = True
 QUANTILE = 0.25
-HOUGH_VOTE_COLOR_LINE = 15
+HOUGH_VOTE_COLOR_LINE = 25
 HOUGH_VOTE_KB = 10
 NUM_OF_HOUGH_LINE = 3
 VECTOR_DIMENSION = 36
@@ -239,7 +239,6 @@ class ColorRemover:
         hough_convas = np.zeros((400, 400), dtype=np.uint8)
         hough_convas_3 = np.zeros((400, 400, 3), dtype=np.uint8)
         # c = 0
-        # TODO: seems here the RGB are seperated.
         for p in hough_points:
             # if c > 100:
             #     break
@@ -249,6 +248,8 @@ class ColorRemover:
                 hough_convas.itemset((x, y), 255)
         cv2.imshow("hough edge", hough_convas)
         cv2.waitKey()
+        # TODO: Problems when there're too little pixels on the edge
+        # TODO: caused by the color line?
         hough_lines = cv2.HoughLinesP(hough_convas, 1, np.pi / 180, HOUGH_VOTE_KB, maxLineGap=100)[0]
         # hough_lines.append(lines)
 
@@ -378,8 +379,7 @@ class ColorRemover:
 
         if merge_to:
             # adjust length of color line
-            # TODO: k and s are not good enough, fix it.
-            # TODO: show the process of each step during the adjustment
+
             k, b = self.calculate_kb(color_line, merge_to)
 
         for pixel in self.pixels_of_color_line[color_line]:
@@ -839,7 +839,7 @@ class ColorRemover:
         cv2.imshow("result", self.gray_after_adjust)
         # self.show_histogram_of_mat(self.gray_after_adjust, "result")
         cv2.waitKey()
-        # print self.calculate_difference()
+        print self.calculate_difference()
         print "done"
 
     def generate_color_points_with_label(self, label_points_dict):
