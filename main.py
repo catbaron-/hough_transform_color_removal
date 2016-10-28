@@ -228,7 +228,7 @@ class ColorRemover:
         points, to_points = [], []
         for pixel, to_pixel in edge_pixels:
             # the pixels has been updated by the transform matrix
-            points += self.img.get_bgr_value(pixel)
+            points += self.img.get_bgr_value(pixel, self.img_after_adjust)
             to_points += self.img.get_bgr_value(to_pixel, self.img_after_adjust)
 
         # points = zip(*points)   # [(r...), (g...), (b...)]
@@ -239,6 +239,7 @@ class ColorRemover:
         hough_convas = np.zeros((400, 400), dtype=np.uint8)
         hough_convas_3 = np.zeros((400, 400, 3), dtype=np.uint8)
         # c = 0
+        # TODO: seems here the RGB are seperated.
         for p in hough_points:
             # if c > 100:
             #     break
@@ -253,7 +254,7 @@ class ColorRemover:
 
         # calculate k and b
         ks, bs = [], []
-        for (x1, y1, x2, y2) in hough_lines:
+        for (y1, x1, y2, x2) in hough_lines:
             if x1 == x2:
                 continue
             ks.append((y2 - y1) / float(x2 - x1))
@@ -266,6 +267,7 @@ class ColorRemover:
         print "ks, bs", ks, bs
         k = sum(ks)/len(ks)
         b = sum(bs)/len(bs)
+
         return k, b
 
     @staticmethod
@@ -368,7 +370,7 @@ class ColorRemover:
             blue, green, red = map(lambda a: a.item(0, 0), matrix_z0 * np.matrix([[blue], [green], [red]]))
             blue, green, red = map(lambda a: a.item(0, 0), matrix_y * np.matrix([[blue], [green], [red]]))
             blue, green, red = map(lambda a: a.item(0, 0), matrix_z1 * np.matrix([[blue], [green], [red]]))
-
+            # print "value 1:, ", pixel, blue, green, red
             x, y = pixel
             self.img_after_adjust.itemset((x, y, 0), blue)
             self.img_after_adjust.itemset((x, y, 1), green)
