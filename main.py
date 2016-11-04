@@ -13,13 +13,15 @@ __author__ = 'wtq'
 # including 3 planes and 4 spheres
 # coding=utf-8
 # IMAGE = "input_img/teapot_ss.png"
-IMAGE = "input_img/sp6.png"
+IMAGE = "input_img/dog.bmp"
 LOCAL = False
 # LOCAL = True
 QUANTILE = 0.25
-HOUGH_VOTE_COLOR_LINE = 25
-HOUGH_VOTE_KB = 10
-NUM_OF_HOUGH_LINE = 3
+HOUGH_VOTE_COLOR_LINE = 55
+MAX_LINE_GAP = 70
+
+HOUGH_VOTE_KB = 30
+NUM_OF_HOUGH_LINE = 6
 VECTOR_DIMENSION = 36
 K_ = 5
 HEMISPHERE_NUM = 10
@@ -222,7 +224,7 @@ class ColorRemover:
         # def show_histogram_of_kb(ks):
 
         if color_line not in self.pixel_edges or to_color_line not in self.pixel_edges[color_line]:
-            return 1
+            return 1, 0, 1
         edge_pixels = self.pixel_edges[color_line][to_color_line]
         # calculate the linear of the edge pixels
         points, to_points = [], []
@@ -236,26 +238,36 @@ class ColorRemover:
 
         # generate hough lines for r, g, b
         hough_points = zip(points, to_points)
-        hough_convas = np.zeros((400, 400), dtype=np.uint8)
-        hough_convas_3 = np.zeros((400, 400, 3), dtype=np.uint8)
+        max_size = np.array(hough_points).max() + 1
+        hough_convas = np.zeros((max_size, max_size), dtype=np.uint8)
+        hough_convas_3 = np.zeros((max_size, max_size, 3), dtype=np.uint8)
         # c = 0
         for p in hough_points:
             # if c > 100:
             #     break
             # c += 1
-            x, y = map(int, p)
+            y, x = map(int, p)  # (y, x) instead of (x, y ) because the hough line will be calculated in reversed way
             if 0 < p[0] < 255 and 1 < p[1] < 255:
                 hough_convas.itemset((x, y), 255)
+            hough_convas.itemset((x, y), 255)
         cv2.imshow("hough edge", hough_convas)
         cv2.waitKey()
-        # TODO: Problems when there're too little pixels on the edge
-        # TODO: caused by the color line?
-        hough_lines = cv2.HoughLinesP(hough_convas, 1, np.pi / 180, HOUGH_VOTE_KB, maxLineGap=100)[0]
+        # Reduce the HOUHG
+        i = 0
+        while i < HOUGH_VOTE_KB:
+            hough_lines_res = cv2.HoughLinesP(hough_convas, 1, np.pi / 180, HOUGH_VOTE_KB-i, maxLineGap=150)
+            if hough_lines_res != None :
+                break
+            i += 1
+        # TODO: if hough vote is not large enoughj, return a flag to use k-norm_back instead
+        if hough_lines_res == None:
+            return 1, 0
+        hough_lines = hough_lines_res[0]
         # hough_lines.append(lines)
 
         # calculate k and b
         ks, bs = [], []
-        for (y1, x1, y2, x2) in hough_lines:
+        for (x1, y1, x2, y2) in hough_lines:
             if x1 == x2:
                 continue
             ks.append((y2 - y1) / float(x2 - x1))
@@ -266,6 +278,8 @@ class ColorRemover:
         cv2.imshow("hough_lines", hough_convas_3)
         cv2.waitKey()
         print "ks, bs", ks, bs
+        if len(ks)*len(bs) == 0:
+            return 1, 0
         k = sum(ks)/len(ks)
         b = sum(bs)/len(bs)
 
@@ -284,6 +298,10 @@ class ColorRemover:
         """
         max_v = mat.max()
         min_v = mat.min()
+        if min_v < 3:
+            print min_v
+            min_v = mat[mat>10].min()
+            print min_v
         rng = max_v - min_v
         if rng <= 255:
             lower = min_v - (255 - rng) / 2
@@ -372,6 +390,7 @@ class ColorRemover:
             blue, green, red = map(lambda a: a.item(0, 0), matrix_y * np.matrix([[blue], [green], [red]]))
             blue, green, red = map(lambda a: a.item(0, 0), matrix_z1 * np.matrix([[blue], [green], [red]]))
             # print "value 1:, ", pixel, blue, green, red
+            blue, green, red = map(lambda a: a + norm_back, [blue, green, red])
             x, y = pixel
             self.img_after_adjust.itemset((x, y, 0), blue)
             self.img_after_adjust.itemset((x, y, 1), green)
@@ -673,7 +692,7 @@ class ColorRemover:
             # cv2.imshow("hough_sphere_" + sphere, self.hough_spheres[sphere])
             # cv2.waitKey()
             sp_map = np.copy(self.hough_spheres[sphere])
-            lines = cv2.HoughLinesP(self.sphere_maps[sphere], 1, np.pi / 180, HOUGH_VOTE_COLOR_LINE, maxLineGap=70)[0]
+            lines = cv2.HoughLinesP(self.sphere_maps[sphere], 1, np.pi / 180, HOUGH_VOTE_COLOR_LINE, maxLineGap=MAX_LINE_GAP)[0]
             i = 0
             for x1, y1, x2, y2 in lines:
                 # line: Ax+By+C=0
@@ -839,7 +858,7 @@ class ColorRemover:
         cv2.imshow("result", self.gray_after_adjust)
         # self.show_histogram_of_mat(self.gray_after_adjust, "result")
         cv2.waitKey()
-        print self.calculate_difference()
+        # print self.calculate_difference()
         print "done"
 
     def generate_color_points_with_label(self, label_points_dict):
