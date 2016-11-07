@@ -5,37 +5,19 @@ import math
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 import os
-import random
-from sklearn.cluster import MeanShift, estimate_bandwidth
-
 __author__ = 'wtq'
 # apply KM when generate hough lines to reduce number of lines
 # including 3 planes and 4 spheres
 # coding=utf-8
-# IMAGE = "input_img/teapot_ss.png"
-IMAGE = "input_img/cylinder.png"
-LOCAL = False
-# LOCAL = True
-QUANTILE = 0.25
-HOUGH_VOTE_COLOR_LINE = 25
-MAX_LINE_GAP = 70
 
-HOUGH_VOTE_KB = 30
-NUM_OF_HOUGH_LINE = 3
+NUM_OF_HOUGH_LINE = 6
 VECTOR_DIMENSION = 36
-K_ = 5
-HEMISPHERE_NUM = 10
+K = 20
+HEMISPHERE_NUM = 20
 COS_FOR_SKELETON = 0.95
 KS_LENGTH = 0
-K_MAX = 6
+K_MAX = 600
 DIR_NAME = "sphere_hough_"
-
-SPHERES = [
-    "rg",
-    "rb",
-    "gb",
-]
-
 
 SPHERES = [
     # "rgb",
@@ -67,7 +49,6 @@ class ColorRemover:
     descriptor_map = None
 
     def __init__(self, img_name):
-        self.img_name, self.img_type = img_name.split(".")
         self.img = bm.Input(img_name)
         size = self.img.img.shape
         self.img_after_adjust = np.zeros(size, dtype=np.int64)
@@ -271,7 +252,7 @@ class ColorRemover:
                 else:
                     self.pixel_edges[color_line][neighbor_color_line].append((pixel, neighbor_pixel))
 
-    def calculate_kb(self, color_line, to_color_line, norm_back = 0):
+    def calculate_k(self, color_line, to_color_line):
         """
         Calculate K for each edge of (color_line, to_color_line).
         Apply k to color_line to match color_line to to_color_line.
@@ -280,116 +261,54 @@ class ColorRemover:
         :param to_color_line:
             Second color line of edge
         :return:
-            Float of k, b, True (means that hough line works and k-b are found)
-            #or k, 0, False (means the hough line is not done successfully and use k-norm_back instead
+            Float of k
         """
-        # def show_histogram_of_kb(ks):
-
         if color_line not in self.pixel_edges or to_color_line not in self.pixel_edges[color_line]:
-            # if color_line is not in any edge, pixels on this line will not be adjusted
-            # move back to norm_back and keep the length
-            return 1, 0
+            return 1
         edge_pixels = self.pixel_edges[color_line][to_color_line]
-
-        # calculate the linear of the edge pixels
-        # using hought line first
-        points, to_points = [], []
+        # calculate difference of BGR norm between two segment around the edge
+        ks = []
+        nb = [-1, 1]
         for pixel, to_pixel in edge_pixels:
-            # the pixels has been updated by the transform matrix
-            points += self.img.get_bgr_value(pixel, self.img_after_adjust)
-            to_points += self.img.get_bgr_value(to_pixel, self.img_after_adjust)
+            points = [self.img.get_bgr_value(pixel), ]
+            x, y = pixel
+            for dx in nb:
+                for dy in nb:
+                    xx = x + dx
+                    yy = y + dy
+                    if (xx, yy) not in self.pixels_of_color_line[color_line]:
+                        continue
+                    points.append(self.img.get_bgr_value((xx, yy)))
+            point_norm_list = map(self.img.get_bgr_norm, points)
+            point_norm = sum(point_norm_list) / float(len(point_norm_list))
+            if point_norm == 0:
+                continue
+            to_points = [self.img.get_bgr_value(to_pixel, self.img_after_adjust), ]
+            x, y = to_pixel
+            for dx in nb:
+                for dy in nb:
+                    xx = x + dx
+                    yy = y + dy
+                    if (xx, yy) not in self.pixels_of_color_line[to_color_line]:
+                        continue
+                    to_points.append(self.img.get_bgr_value((xx, yy), self.img_after_adjust))
+            to_point_norm_list = map(self.img.get_bgr_norm, to_points)
+            to_point_norm = sum(to_point_norm_list) / float(len(to_point_norm_list))
+            _k = to_point_norm / float(point_norm)
+            # if _k > 10:
+            #     print "to/from list:", to_point_norm_list, point_norm_list
+            #     print "to/from:", to_point_norm, point_norm
+            ks.append(_k)
 
-        # generate hough lines for r, g, b
-        hough_points = zip(points, to_points)
-        max_size = np.array(hough_points).max() + 1
-        hough_convas = np.zeros((max_size, max_size), dtype=np.uint8)
-        hough_convas_3 = np.zeros((max_size, max_size, 3), dtype=np.uint8)
-        # c = 0
-        for p in hough_points:
-            # if c > 100:
-            #     break
-            # c += 1
-            y, x = map(int, p)  # (y, x) instead of (x, y ) because the hough line will be calculated in reversed way
-            if 0 < p[0] < 255 and 1 < p[1] < 255:
-                cv2.circle(hough_convas, (y, x), 2, [255,255,255])
-                # hough_convas.itemset((x, y), 255)
-            hough_convas.itemset((x, y), 255)
-        cv2.imshow("hough edge", hough_convas)
-        cv2.waitKey()
-        # Reduce the HOUHG
-        i = 0
-        while i < HOUGH_VOTE_KB:
-            hough_lines_res = cv2.HoughLinesP(hough_convas, 1, np.pi / 180, HOUGH_VOTE_KB-i, maxLineGap=150)
-            if hough_lines_res != None :
-                break
-            i += 1
-        # TODO: if hough vote is not large enoughj, return a flag to use k-norm_back instead
-        if hough_lines_res != None:
-            hough_lines = hough_lines_res[0]
-            # hough_lines.append(lines)
-
-            # calculate k and b
-            ks, bs = [], []
-            for (x1, y1, x2, y2) in hough_lines:
-                if x1 == x2:
-                    continue
-                ks.append((y2 - y1) / float(x2 - x1))
-                bs.append(y1 - ks[-1] * x1)
-                # show the lines
-                color = [random.randint(10, 255), random.randint(100, 255), random.randint(1, 255)]
-                cv2.line(hough_convas_3, (int(x1), int(y1)), (int(x2), int(y2)), color, 3)
-            cv2.imshow("hough_lines", hough_convas_3)
-            cv2.waitKey()
-            print "ks, bs", ks, bs
-            if len(ks) * len(bs) == 0:
-                return 1, 0
-            k = sum(ks) / len(ks)
-            b = sum(bs) / len(bs)
-            return k, b
-        else:
-            # no hough line is generated, use k-norm_back instead
-            ks = []
-            nb = [-1, 1]
-            for pixel, to_pixel in edge_pixels:
-                points = [self.img.get_bgr_value(pixel), ]
-                x, y = pixel
-                for dx in nb:
-                    for dy in nb:
-                        xx = x + dx
-                        yy = y + dy
-                        if (xx, yy) not in self.pixels_of_color_line[color_line]:
-                            continue
-                        points.append(self.img.get_bgr_value((xx, yy)))
-                point_norm_list = map(self.img.get_bgr_norm, points)
-                point_norm = sum(point_norm_list) / float(len(point_norm_list))
-                if point_norm == 0:
-                    continue
-                to_points = [self.img.get_bgr_value(to_pixel, self.img_after_adjust), ]
-                x, y = to_pixel
-                for dx in nb:
-                    for dy in nb:
-                        xx = x + dx
-                        yy = y + dy
-                        if (xx, yy) not in self.pixels_of_color_line[to_color_line]:
-                            continue
-                        to_points.append(self.img.get_bgr_value((xx, yy), self.img_after_adjust))
-                to_point_norm_list = map(self.img.get_bgr_norm, to_points)
-                to_point_norm = sum(to_point_norm_list) / float(len(to_point_norm_list))
-                _k = (to_point_norm - norm_back) / float(point_norm)
-                # if _k > 10:
-                #     print "to/from list:", to_point_norm_list, point_norm_list
-                #     print "to/from:", to_point_norm, point_norm
-                ks.append(_k)
-            ks.sort()
-            mean = 1
-            if len(ks) > KS_LENGTH:
-                mean = np.mean(ks)
-            if mean > K_MAX:
-                mean = K_MAX
-            if mean == 0:
-                mean = 1
-            return mean, norm_back
-            # k-norm-back finished
+        # find best ks with least var
+        ks.sort()
+        mean = 1
+        if len(ks) > KS_LENGTH:
+            mean = np.mean(ks)
+        if mean > K_MAX:
+            mean = K_MAX
+        print "ks:", ks
+        return mean
 
     @staticmethod
     def normalize(mat):
@@ -404,10 +323,6 @@ class ColorRemover:
         """
         max_v = mat.max()
         min_v = mat.min()
-        if min_v < 3:
-            print min_v
-            min_v = mat[mat>10].min()
-            print min_v
         rng = max_v - min_v
         if rng <= 255:
             lower = min_v - (255 - rng) / 2
@@ -423,8 +338,6 @@ class ColorRemover:
         return mat
 
     def transform_points(self, color_line, merge_to=None):
-
-
         """
         Transform points belont to color_line
         Generate Matrix for translate and rotate, caculate k.
@@ -435,7 +348,7 @@ class ColorRemover:
         :return:
             Nothing
         """
-        # print "adjust ", color_line
+        print "adjust ", color_line
         # translate point to matrix to make calculate simple
         matrix_p0 = np.float32(color_line[0])
         matrix_p1 = np.float32(color_line[1])
@@ -448,7 +361,8 @@ class ColorRemover:
         b_p0, g_p0, r_p0 = matrix_p0
         # length of projection of line on bg
         norm_bg = math.sqrt(b_v ** 2 + g_v ** 2)
-
+        # parameter K
+        k = 1
         # list for filter values after adjusted
         filter_list = []
         # angles for rotating
@@ -484,43 +398,29 @@ class ColorRemover:
             [0, 0, 1],
         ])
 
-        # start to adjust
-        k, b = 1, norm_back
-
-        # TODO: show the region and region_to
-        region = np.zeros(self.img.size, dtype=np.int8)  # used for showing the current region
-
-        print "transform in matrix:"
+        if merge_to:
+            # adjust length of color line
+            k = self.calculate_k(color_line, merge_to)
+            print "KKKKKKKKKKKKK:", k
         for pixel in self.pixels_of_color_line[color_line]:
             blue, green, red = self.img.get_bgr_value(pixel)
             # move to origin
-            red -= np.float(r_p0)
-            green -= np.float(g_p0)
-            blue -= np.float(b_p0)
+            red -= float(r_p0)
+            green -= float(g_p0)
+            blue -= float(b_p0)
+
             # rotate to x=y=z
             blue, green, red = map(lambda a: a.item(0, 0), matrix_z0 * np.matrix([[blue], [green], [red]]))
             blue, green, red = map(lambda a: a.item(0, 0), matrix_y * np.matrix([[blue], [green], [red]]))
             blue, green, red = map(lambda a: a.item(0, 0), matrix_z1 * np.matrix([[blue], [green], [red]]))
-            # print "value 1:, ", pixel, blue, green, red
+
+            # move to start point of segment
             blue, green, red = map(lambda a: a + norm_back, [blue, green, red])
+            if merge_to:
+                blue, green, red = map(lambda a: a * k, [blue, green, red])
+            filter_list += [blue, green, red]
+
             x, y = pixel
-            self.img_after_adjust.itemset((x, y, 0), blue)
-            self.img_after_adjust.itemset((x, y, 1), green)
-            self.img_after_adjust.itemset((x, y, 2), red)
-
-        if merge_to:
-            # adjust length of color line
-
-            k, b = self.calculate_kb(color_line, merge_to)
-
-        for pixel in self.pixels_of_color_line[color_line]:
-            # blue, green, red = self.img.get_bgr_value(pixel, self.img_after_adjust)
-            # blue = blue*kb + bb
-            # green = green * kg + bg
-            # red = red * kr + br
-            blue, green, red = map(lambda v: v*k+b, self.img.get_bgr_value(pixel, self.img_after_adjust))
-            x, y = pixel
-            # print blue, green, red
             self.img_after_adjust.itemset((x, y, 0), blue)
             self.img_after_adjust.itemset((x, y, 1), green)
             self.img_after_adjust.itemset((x, y, 2), red)
@@ -537,6 +437,7 @@ class ColorRemover:
                 # if len(self.points_of_color_line[color_line]) < 50:
                 #     continue
                 self.transform_points(line, color_line)
+
     def adjust_color(self):
         """
         Main process of color adjustment based on color lines.
@@ -555,18 +456,16 @@ class ColorRemover:
                 #     continue
                 self.transform_points(color_line)
         # normalize _img
-        self.show_histogram_of_mat(self.img_after_adjust, "histogram of _img after adjust before normalize")
+        self.show_histogram_of_mat(self.img_after_adjust, "histogram of _img after adjust before normalize", limit=7700)
         self.img_after_adjust = self.normalize(self.img_after_adjust)
         self.show_histogram_of_mat(self.img_after_adjust, "histogram of _img after adjust")
-        for x, y in self.img.pixels:
+        for x, y in self.img.pixels_points:
             for c in range(3):
                 v = self.img_after_adjust.item((x, y, c))
                 self.adjusted_img.itemset((x, y, c), v)
         for x, y in self.img.bg_pixels:
             for c in range(3):
                 self.adjusted_img.itemset((x, y, c), 255)
-        # cv2.imshow("before normalize", self.adjusted_img)
-        # cv2.waitKey()
         return cv2.cvtColor(self.adjusted_img, cv2.COLOR_RGB2GRAY, self.gray_after_adjust)
 
     def show_lines_points(self, lines, points, title="lines & points"):
@@ -575,7 +474,7 @@ class ColorRemover:
         self.img.fig_set_label(ax)
         self.img.fig_draw_lines(ax, lines)
         self.img.fig_draw_points(ax, points)
-        # self.img.draw_hemi(ax, HEMISPHERE_NUM, self.slice_width, self.slice_start_norm)
+        self.img.draw_hemi(ax, HEMISPHERE_NUM, self.slice_width, self.slice_start_norm)
         plt.show()
 
     def show_lines(self, lines, title="lines"):
@@ -583,7 +482,7 @@ class ColorRemover:
         ax = fig.add_subplot(111, projection="3d", title=title)
         self.img.fig_set_label(ax)
         self.img.fig_draw_lines(ax, lines)
-        # self.img.draw_hemi(ax, int(HEMISPHERE_NUM), self.slice_width)
+        self.img.draw_hemi(ax, int(HEMISPHERE_NUM), self.slice_width)
         plt.show()
 
     def show_points(self, points, title="points"):
@@ -592,7 +491,7 @@ class ColorRemover:
         self.img.fig_set_label(ax)
         points = set(map(lambda x: tuple(x), points))
         self.img.fig_draw_points(ax, points)
-        # self.img.draw_hemi(ax, HEMISPHERE_NUM, self.slice_width)
+        self.img.draw_hemi(ax, HEMISPHERE_NUM, self.slice_width)
 
     def show_points_2(self, points1, points2, title1="points1", title2="points2"):
         fig = plt.figure()
@@ -613,11 +512,9 @@ class ColorRemover:
         fig = plt.figure()
         ax = fig.add_subplot(111, projection="3d", title="BGR Histogram")
         self.img.fig_set_label(ax)
-        points = map(lambda x: tuple(x), self.img.points.keys())
+        points = map(lambda x: tuple(x), self.img.pixels_points.values())
         points = set(points)
         self.img.fig_draw_points(ax, points)
-        # self.img.draw_hemi(ax, HEMISPHERE_NUM, self.slice_width, self.slice_start_norm)
-
         plt.show()
 
     def show_histogram_of_mat(self, mat, title="Mat Histogram", limit=300):
@@ -674,11 +571,6 @@ class ColorRemover:
 
     def show_pixels(self, pixels, num=0):
         img = np.zeros(self.img.bgr.shape, np.uint8)
-        rows, cols, _ = img.shape
-        for row, col in [(r, c) for r in range(rows) for c in range(cols)]:
-            img.itemset((row, col, 0), 255)
-            img.itemset((row, col, 1), 255)
-            img.itemset((row, col, 2), 255)
         for x, y in pixels:
             img.itemset((x, y, 0), self.img.bgr.item((x, y, 0)))
             img.itemset((x, y, 1), self.img.bgr.item((x, y, 1)))
@@ -694,7 +586,7 @@ class ColorRemover:
         # hough_lines:(A, B, C, x1, y1, x2, y2)
         # k-means to cluster lines
         merged_lines = []
-        descriptors = map(lambda line: line[0:2], hough_lines)
+        descriptors = map(lambda line: line[1:3], hough_lines)
         descriptors = np.array(descriptors)
         # initial k-m
         km = KMeans(n_clusters=NUM_OF_HOUGH_LINE, max_iter=600)
@@ -801,85 +693,48 @@ class ColorRemover:
             # do hough transform and generate hough lines
             hough_lines_sphere = []
             cv2.imshow("hough_sphere_" + sphere, self.hough_spheres[sphere])
-            # cv2.waitKey()
+            cv2.waitKey()
             sp_map = np.copy(self.hough_spheres[sphere])
-            lines = cv2.HoughLinesP(self.sphere_maps[sphere], 1, np.pi/180, HOUGH_VOTE_COLOR_LINE, maxLineGap=70)[0]
+            lines = cv2.HoughLinesP(self.sphere_maps[sphere], 1, np.pi/180, 50, maxLineGap=50)[0]
             i = 0
             for x1, y1, x2, y2 in lines:
-                # line: Ax+By+C=0
-
-                # a0 = y2-y1 if y2 != y1 else 0.0001
-                # a = 1.0
-                # b = (x1-x2)/float(a0)
-                # c = (x2*y1-x1*y2)/(x2-x1)/float(a0)
-
-                if y2 == y1:
-                    a = 0.0
-                    b = 1.0
-                    c = float(-y1)
-                elif x2 == x1:
-                    a = 1.0
-                    b = 0.0
-                    c = float(-x1)
-                else:
-                    a0 = y2-y1
-                    a = 1.0
-                    b = (x1-x2)/float(a0)
-                    c = (x2*y1-x1*y2)/(x2-x1)/float(a0)
-                    # c = (x2-x1)*y1/float(y2-y1)-x1
+                # line: Ax+By+c=0
+                a0 = y2-y1 if y2 != y1 else 0.0001
+                a = 1.0
+                b = (x1-x2)/float(a0)
+                c = (x2*y1-x1*y2)/(x2-x1)/float(a0)
                 hough_lines_sphere.append((a, b, c, x1, y1, x2, y2))
 
             if len(hough_lines_sphere) > NUM_OF_HOUGH_LINE:
                 hough_lines_sphere = self.km_houg_lines(hough_lines_sphere)
 
             for a, b, c, x1, y1, x2, y2 in hough_lines_sphere:
-                color = [random.randint(10, 255), random.randint(100, 255), random.randint(1, 255)]
-                # color[0] = 255
-                # color[(i + 1) % 3] = 255
+                color = [0, 0, 0]
+                color[i % 3] = 255
                 i += 1
                 color = tuple(color)
-                cv2.line(sp_map, (int(x1), int(y1)), (int(x2), int(y2)), color, 3)
-                print "hough lines:", (a, b, c)
+                cv2.line(sp_map, (int(x1), int(y1)), (int(x2), int(y2)), color, 2)
 
-            cv2.imshow("hough lines " + sphere, sp_map)
-            # cv2.waitKey()
+            cv2.imshow("hough lines", sp_map)
+            cv2.waitKey()
 
             # cluster
-            min_lines = []
             for angle_a, angle_b in self.pixels_of_angle_in_sphere[sphere]:
                 min_dist = 360*360*2
                 min_line = hough_lines_sphere[0]
                 for a, b, c, x1, y1, x2, y2 in hough_lines_sphere:
                     dist = np.power(a*angle_a+b*angle_b+c, 2)/(a*a+b*b)
-                    if dist < min_dist:
+                    if dist <= min_dist:
                         min_dist = dist
-                        min_line = (x1, y1, x2, y2)
-                    if dist == min_dist:
-                        xs = [x1, x2]
-                        ys = [y1, y2]
-                        xs.sort()
-                        ys.sort()
-                        if xs[0] < angle_a < xs[1] and ys[0] < angle_b < ys[1]:
-                            min_dist = dist
-                            min_line = (x1, y1, x2, y2)
-                if sphere=="rb" and min_line not in min_lines:
-                    min_lines.append(min_line)
+                        min_line = (b, c)
 
-                pixels = self.pixels_of_angle_in_sphere[sphere][(angle_a, angle_b)]
+                piexls = self.pixels_of_angle_in_sphere[sphere][(angle_a, angle_b)]
                 self.points_of_hough_line_in_sphere[sphere][min_line] = \
                     self.points_of_hough_line_in_sphere[sphere].get(min_line, []) +\
-                    [self.img.get_bgr_value(p) for p in pixels]
+                    [self.img.get_bgr_value(p) for p in piexls]
                 for point in self.points_of_hough_line_in_sphere[sphere][min_line]:
                     self.hough_line_of_point_in_sphere[sphere][point] = min_line
-            if sphere=="rb":
-                print "mine_lines " + sphere, ":", min_lines
-                print self.points_of_hough_line_in_sphere[sphere].keys()
-                print "lines:",hough_lines_sphere
-                rb_sphere = np.zeros((400, 400, 3), dtype=np.uint8)  # for show
-                for line in min_lines:
-                    cv2.line(rb_sphere, (int(line[0]), int(line[1])), (int(line[2]), int(line[3])), [255, 255, 255])
-                # cv2.imshow("min_lines", rb_sphere)
-                # cv2.waitKey()
+
         # merge the results of cluster
         for pixel in self.img.fg_pixels:
             point = self.img.get_bgr_value(pixel)
@@ -892,42 +747,12 @@ class ColorRemover:
             self.hough_lines_of_point[point] = lines
             self.points_of_hough_line[lines] = self.points_of_hough_line.get(lines, ()) + (point,)
             self.pixels_of_hough_line[lines] = self.pixels_of_hough_line.get(lines, ()) + (pixel,)
-        cv2.waitKey()
-
-    def meanshift_for_hough_line(self):
-        # init mean shift
-        pixels_of_label = {}
-        points_of_label = {}
-        for hough_line in self.points_of_hough_line:
-            pixels = self.pixels_of_hough_line[hough_line]
-            pixels = np.array(pixels)
-            bandwidth = estimate_bandwidth(pixels, quantile=QUANTILE, n_samples=500)
-            if bandwidth == 0:
-                bandwidth = 2
-            ms = MeanShift(bandwidth=bandwidth, bin_seeding=True)
-            ms.fit(pixels)
-            labels = ms.labels_
-            labels_unique = np.unique(labels)
-            n_clusters_ = len(labels_unique)
-            for k in range(n_clusters_):
-                label = list(hough_line)
-                label.append(k)
-                pixels_of_label[tuple(label)] = map(tuple, pixels[labels==k])
-        for label in pixels_of_label:
-            pixels = pixels_of_label[label]
-            points = map(self.img.get_bgr_value, pixels)
-            points_of_label[label] = points
-        self.pixels_of_hough_line = pixels_of_label
-        self.points_of_hough_line = points_of_label
 
     def main_process_of_color_line_sphere_hough(self):
         print "Projecting pixels to sphere...",
         self.generate_hough_line()
         print "done"
-        print "locally...",
-        if LOCAL:
-            self.meanshift_for_hough_line()
-        print "locally done"
+
         # self.show_cluster_points_hough_1()
         # self.show_label_points_1()
         print "done"
@@ -951,8 +776,8 @@ class ColorRemover:
             num += 1
 
         # self.show_lines(self.line_pixels.keys(), "color_lines")
-        self.show_lines(self.pixels_of_color_line.keys())
-        # self.show_lines_points(self.pixels_of_color_line.keys(), self.color_line_of_point.keys())
+
+        self.show_lines_points(self.pixels_of_color_line.keys(), self.color_line_of_point.keys())
         # for cl in points_cluster_to_line:
         #     self.show_lines_points([cl], points_cluster_to_line[cl], "clusters")
 
@@ -961,9 +786,7 @@ class ColorRemover:
         dir_name = DIR_NAME + self.img.img_name
         cv2.imwrite(dir_name+"/result.bmp", self.gray_after_adjust)
         cv2.imshow("result", self.gray_after_adjust)
-        # self.show_histogram_of_mat(self.gray_after_adjust, "result")
         cv2.waitKey()
-        # print self.calculate_difference()
         print "done"
 
     def generate_color_points_with_label(self, label_points_dict):
@@ -978,15 +801,15 @@ class ColorRemover:
                 return False
             return True
 
-        def get_color_line_points(arr_points, slice_width, slice_start_norm):
+        def get_color_line_points(arr_points):
             # unique
             points = set(map(tuple, arr_points))
             if not points:
                 return None
             color_line_points = []
             # find intersect points
-            for slice_seq in range(1, HEMISPHERE_NUM):
-                r = slice_width*slice_seq + slice_start_norm
+            for slice_seq in range(0, HEMISPHERE_NUM):
+                r = self.slice_width*slice_seq + self.slice_start_norm
                 intersect_points = filter(lambda point: is_intersect(point, r), points)
                 if intersect_points:
                     color_line_points.append(tuple(map(np.mean, zip(*intersect_points))))
@@ -1002,87 +825,10 @@ class ColorRemover:
             return color_line_points
 
         for label in label_points_dict:
-            print "LABEL:", label
             points = label_points_dict[label]
-            norms = map(self.img.get_bgr_norm, points)
-            start_norm = min(norms)
-            end_norm = max(norms)
-            slice_width = (end_norm-start_norm)/HEMISPHERE_NUM
             if points:
-                self.color_line_points[label] = get_color_line_points(points,slice_width, start_norm)
+                self.color_line_points[label] = get_color_line_points(points)
 
-    def calculate_difference(self):
-        input_name = self.img_name
-        img_type = self.img_type
-        truth_name = input_name+"1."+img_type
-        truth_img = bm.Input(truth_name)
-
-        gray = self.img.gray
-        gray_result = self.gray_after_adjust
-        gray_truth = cv2.cvtColor(truth_img.img, cv2.COLOR_BGR2GRAY)
-
-        resized_gray = self.img.resize_fg_gray(gray)
-        resized_truth = truth_img.resize_fg_gray(gray_truth)
-        resized_result = self.img.resize_fg_gray(gray_result)
-
-        cv2.imshow("resized_gray", resized_gray)
-        cv2.imshow("resized_truth", resized_truth)
-        cv2.imshow("resized_result", resized_result)
-        cv2.waitKey()
-
-        diff_result = resized_result.astype(float) - resized_truth.astype(float)
-        diff_result = diff_result[resized_result < 255]
-        diff_gray = resized_gray.astype(float) - resized_truth.astype(float)
-        diff_gray = diff_gray[resized_gray < 255]
-
-        data = np.array([diff_result.flatten(), diff_gray.flatten()]).transpose()
-
-        hist_truth = resized_truth[resized_truth<255]
-        hist_result = resized_result[resized_result<255]
-        hist_gray = resized_gray[resized_gray<255]
-
-        plt.figure()
-        plt.xlim(0, 255)
-        n, bins, patches = plt.hist(hist_truth, 40, normed=1, alpha=0.75)
-        plt.title('Histogram of truth')
-        plt.xlabel('value')
-        plt.ylabel('percent')
-        plt.show()
-
-        plt.figure()
-        plt.xlim(0, 255)
-        n, bins, patches = plt.hist(hist_result, 40, normed=1, alpha=0.75)
-        plt.title('Histogram of result')
-        plt.xlabel('value')
-        plt.ylabel('percent')
-        plt.show()
-
-        plt.figure()
-        plt.xlim(0, 255)
-        n, bins, patches = plt.hist(hist_gray, 40, normed=1, alpha=0.75)
-        plt.title('Histogram of gray')
-        plt.xlabel('value')
-        plt.ylabel('percent')
-        plt.show()
-
-        plt.figure()
-        plt.xlim(-255, 255)
-        n, bins, patches = plt.hist(diff_result, 40, normed=1, alpha=0.75)
-        plt.title('Histogram of difference between result and truth')
-        plt.xlabel('value')
-        plt.ylabel('percent')
-        plt.show()
-
-        plt.figure()
-        plt.xlim(-255, 255)
-        n, bins, patches = plt.hist(diff_gray, 40, normed=1, alpha=0.75)
-        plt.title('Histogram of difference between linear luminance and truth')
-        plt.xlabel('value')
-        plt.ylabel('percent')
-        plt.show()
-
-        # cv2.waitKey()
-        return np.abs(diff_result).mean(), diff_result.std(), np.abs(diff_gray).mean(), diff_gray.std()
 
 if __name__ == "__main__":
     files = [
@@ -1094,7 +840,7 @@ if __name__ == "__main__":
         # "_img/sp5080.png",
         # "_img/sp6.png",
         # "img/cylinder.png",
-        IMAGE,#"local/tiger.png",
+        "input_img/dog.png",
     ]
 
     # files = ["_img/bird.bmp"]

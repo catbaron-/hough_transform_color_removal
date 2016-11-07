@@ -12,15 +12,11 @@ __author__ = 'wtq'
 # apply KM when generate hough lines to reduce number of lines
 # including 3 planes and 4 spheres
 # coding=utf-8
-# IMAGE = "input_img/teapot_ss.png"
 IMAGE = "input_img/cylinder.png"
 LOCAL = False
-# LOCAL = True
+LOCAL = True
 QUANTILE = 0.25
-HOUGH_VOTE_COLOR_LINE = 25
-MAX_LINE_GAP = 70
-
-HOUGH_VOTE_KB = 30
+HOUGH_VOTE = 25
 NUM_OF_HOUGH_LINE = 3
 VECTOR_DIMENSION = 36
 K_ = 5
@@ -29,13 +25,6 @@ COS_FOR_SKELETON = 0.95
 KS_LENGTH = 0
 K_MAX = 6
 DIR_NAME = "sphere_hough_"
-
-SPHERES = [
-    "rg",
-    "rb",
-    "gb",
-]
-
 
 SPHERES = [
     # "rgb",
@@ -271,7 +260,7 @@ class ColorRemover:
                 else:
                     self.pixel_edges[color_line][neighbor_color_line].append((pixel, neighbor_pixel))
 
-    def calculate_kb(self, color_line, to_color_line, norm_back = 0):
+    def calculate_k(self, color_line, to_color_line):
         """
         Calculate K for each edge of (color_line, to_color_line).
         Apply k to color_line to match color_line to to_color_line.
@@ -280,116 +269,55 @@ class ColorRemover:
         :param to_color_line:
             Second color line of edge
         :return:
-            Float of k, b, True (means that hough line works and k-b are found)
-            #or k, 0, False (means the hough line is not done successfully and use k-norm_back instead
+            Float of k
         """
-        # def show_histogram_of_kb(ks):
-
         if color_line not in self.pixel_edges or to_color_line not in self.pixel_edges[color_line]:
-            # if color_line is not in any edge, pixels on this line will not be adjusted
-            # move back to norm_back and keep the length
-            return 1, 0
+            return 1
         edge_pixels = self.pixel_edges[color_line][to_color_line]
-
-        # calculate the linear of the edge pixels
-        # using hought line first
-        points, to_points = [], []
+        # calculate difference of BGR norm between two segment around the edge
+        ks = []
+        nb = [-1, 1]
         for pixel, to_pixel in edge_pixels:
-            # the pixels has been updated by the transform matrix
-            points += self.img.get_bgr_value(pixel, self.img_after_adjust)
-            to_points += self.img.get_bgr_value(to_pixel, self.img_after_adjust)
+            points = [self.img.get_bgr_value(pixel), ]
+            x, y = pixel
+            for dx in nb:
+                for dy in nb:
+                    xx = x + dx
+                    yy = y + dy
+                    if (xx, yy) not in self.pixels_of_color_line[color_line]:
+                        continue
+                    points.append(self.img.get_bgr_value((xx, yy)))
+            point_norm_list = map(self.img.get_bgr_norm, points)
+            point_norm = sum(point_norm_list) / float(len(point_norm_list))
+            if point_norm == 0:
+                continue
+            to_points = [self.img.get_bgr_value(to_pixel, self.img_after_adjust), ]
+            x, y = to_pixel
+            for dx in nb:
+                for dy in nb:
+                    xx = x + dx
+                    yy = y + dy
+                    if (xx, yy) not in self.pixels_of_color_line[to_color_line]:
+                        continue
+                    to_points.append(self.img.get_bgr_value((xx, yy), self.img_after_adjust))
+            to_point_norm_list = map(self.img.get_bgr_norm, to_points)
+            to_point_norm = sum(to_point_norm_list) / float(len(to_point_norm_list))
+            _k = to_point_norm / float(point_norm)
+            # if _k > 10:
+            #     print "to/from list:", to_point_norm_list, point_norm_list
+            #     print "to/from:", to_point_norm, point_norm
+            ks.append(_k)
 
-        # generate hough lines for r, g, b
-        hough_points = zip(points, to_points)
-        max_size = np.array(hough_points).max() + 1
-        hough_convas = np.zeros((max_size, max_size), dtype=np.uint8)
-        hough_convas_3 = np.zeros((max_size, max_size, 3), dtype=np.uint8)
-        # c = 0
-        for p in hough_points:
-            # if c > 100:
-            #     break
-            # c += 1
-            y, x = map(int, p)  # (y, x) instead of (x, y ) because the hough line will be calculated in reversed way
-            if 0 < p[0] < 255 and 1 < p[1] < 255:
-                cv2.circle(hough_convas, (y, x), 2, [255,255,255])
-                # hough_convas.itemset((x, y), 255)
-            hough_convas.itemset((x, y), 255)
-        cv2.imshow("hough edge", hough_convas)
-        cv2.waitKey()
-        # Reduce the HOUHG
-        i = 0
-        while i < HOUGH_VOTE_KB:
-            hough_lines_res = cv2.HoughLinesP(hough_convas, 1, np.pi / 180, HOUGH_VOTE_KB-i, maxLineGap=150)
-            if hough_lines_res != None :
-                break
-            i += 1
-        # TODO: if hough vote is not large enoughj, return a flag to use k-norm_back instead
-        if hough_lines_res != None:
-            hough_lines = hough_lines_res[0]
-            # hough_lines.append(lines)
-
-            # calculate k and b
-            ks, bs = [], []
-            for (x1, y1, x2, y2) in hough_lines:
-                if x1 == x2:
-                    continue
-                ks.append((y2 - y1) / float(x2 - x1))
-                bs.append(y1 - ks[-1] * x1)
-                # show the lines
-                color = [random.randint(10, 255), random.randint(100, 255), random.randint(1, 255)]
-                cv2.line(hough_convas_3, (int(x1), int(y1)), (int(x2), int(y2)), color, 3)
-            cv2.imshow("hough_lines", hough_convas_3)
-            cv2.waitKey()
-            print "ks, bs", ks, bs
-            if len(ks) * len(bs) == 0:
-                return 1, 0
-            k = sum(ks) / len(ks)
-            b = sum(bs) / len(bs)
-            return k, b
-        else:
-            # no hough line is generated, use k-norm_back instead
-            ks = []
-            nb = [-1, 1]
-            for pixel, to_pixel in edge_pixels:
-                points = [self.img.get_bgr_value(pixel), ]
-                x, y = pixel
-                for dx in nb:
-                    for dy in nb:
-                        xx = x + dx
-                        yy = y + dy
-                        if (xx, yy) not in self.pixels_of_color_line[color_line]:
-                            continue
-                        points.append(self.img.get_bgr_value((xx, yy)))
-                point_norm_list = map(self.img.get_bgr_norm, points)
-                point_norm = sum(point_norm_list) / float(len(point_norm_list))
-                if point_norm == 0:
-                    continue
-                to_points = [self.img.get_bgr_value(to_pixel, self.img_after_adjust), ]
-                x, y = to_pixel
-                for dx in nb:
-                    for dy in nb:
-                        xx = x + dx
-                        yy = y + dy
-                        if (xx, yy) not in self.pixels_of_color_line[to_color_line]:
-                            continue
-                        to_points.append(self.img.get_bgr_value((xx, yy), self.img_after_adjust))
-                to_point_norm_list = map(self.img.get_bgr_norm, to_points)
-                to_point_norm = sum(to_point_norm_list) / float(len(to_point_norm_list))
-                _k = (to_point_norm - norm_back) / float(point_norm)
-                # if _k > 10:
-                #     print "to/from list:", to_point_norm_list, point_norm_list
-                #     print "to/from:", to_point_norm, point_norm
-                ks.append(_k)
-            ks.sort()
+        # find best ks with least var
+        ks.sort()
+        mean = 1
+        if len(ks) > KS_LENGTH:
+            mean = np.mean(ks)
+        if mean > K_MAX:
+            mean = K_MAX
+        if mean == 0:
             mean = 1
-            if len(ks) > KS_LENGTH:
-                mean = np.mean(ks)
-            if mean > K_MAX:
-                mean = K_MAX
-            if mean == 0:
-                mean = 1
-            return mean, norm_back
-            # k-norm-back finished
+        return mean
 
     @staticmethod
     def normalize(mat):
@@ -404,10 +332,6 @@ class ColorRemover:
         """
         max_v = mat.max()
         min_v = mat.min()
-        if min_v < 3:
-            print min_v
-            min_v = mat[mat>10].min()
-            print min_v
         rng = max_v - min_v
         if rng <= 255:
             lower = min_v - (255 - rng) / 2
@@ -423,8 +347,6 @@ class ColorRemover:
         return mat
 
     def transform_points(self, color_line, merge_to=None):
-
-
         """
         Transform points belont to color_line
         Generate Matrix for translate and rotate, caculate k.
@@ -448,7 +370,8 @@ class ColorRemover:
         b_p0, g_p0, r_p0 = matrix_p0
         # length of projection of line on bg
         norm_bg = math.sqrt(b_v ** 2 + g_v ** 2)
-
+        # parameter K
+        k = 1
         # list for filter values after adjusted
         filter_list = []
         # angles for rotating
@@ -484,43 +407,29 @@ class ColorRemover:
             [0, 0, 1],
         ])
 
-        # start to adjust
-        k, b = 1, norm_back
-
-        # TODO: show the region and region_to
-        region = np.zeros(self.img.size, dtype=np.int8)  # used for showing the current region
-
-        print "transform in matrix:"
+        if merge_to:
+            # adjust length of color line
+            k = self.calculate_k(color_line, merge_to)
+            print "KKKKKKKKKKKKK:", k
         for pixel in self.pixels_of_color_line[color_line]:
             blue, green, red = self.img.get_bgr_value(pixel)
             # move to origin
-            red -= np.float(r_p0)
-            green -= np.float(g_p0)
-            blue -= np.float(b_p0)
+            red -= float(r_p0)
+            green -= float(g_p0)
+            blue -= float(b_p0)
+
             # rotate to x=y=z
             blue, green, red = map(lambda a: a.item(0, 0), matrix_z0 * np.matrix([[blue], [green], [red]]))
             blue, green, red = map(lambda a: a.item(0, 0), matrix_y * np.matrix([[blue], [green], [red]]))
             blue, green, red = map(lambda a: a.item(0, 0), matrix_z1 * np.matrix([[blue], [green], [red]]))
-            # print "value 1:, ", pixel, blue, green, red
+
+            # move to start point of segment
             blue, green, red = map(lambda a: a + norm_back, [blue, green, red])
+            if merge_to:
+                blue, green, red = map(lambda a: a * k, [blue, green, red])
+            filter_list += [blue, green, red]
+
             x, y = pixel
-            self.img_after_adjust.itemset((x, y, 0), blue)
-            self.img_after_adjust.itemset((x, y, 1), green)
-            self.img_after_adjust.itemset((x, y, 2), red)
-
-        if merge_to:
-            # adjust length of color line
-
-            k, b = self.calculate_kb(color_line, merge_to)
-
-        for pixel in self.pixels_of_color_line[color_line]:
-            # blue, green, red = self.img.get_bgr_value(pixel, self.img_after_adjust)
-            # blue = blue*kb + bb
-            # green = green * kg + bg
-            # red = red * kr + br
-            blue, green, red = map(lambda v: v*k+b, self.img.get_bgr_value(pixel, self.img_after_adjust))
-            x, y = pixel
-            # print blue, green, red
             self.img_after_adjust.itemset((x, y, 0), blue)
             self.img_after_adjust.itemset((x, y, 1), green)
             self.img_after_adjust.itemset((x, y, 2), red)
@@ -537,6 +446,7 @@ class ColorRemover:
                 # if len(self.points_of_color_line[color_line]) < 50:
                 #     continue
                 self.transform_points(line, color_line)
+
     def adjust_color(self):
         """
         Main process of color adjustment based on color lines.
@@ -803,7 +713,7 @@ class ColorRemover:
             cv2.imshow("hough_sphere_" + sphere, self.hough_spheres[sphere])
             # cv2.waitKey()
             sp_map = np.copy(self.hough_spheres[sphere])
-            lines = cv2.HoughLinesP(self.sphere_maps[sphere], 1, np.pi/180, HOUGH_VOTE_COLOR_LINE, maxLineGap=70)[0]
+            lines = cv2.HoughLinesP(self.sphere_maps[sphere], 1, np.pi/180, HOUGH_VOTE, maxLineGap=70)[0]
             i = 0
             for x1, y1, x2, y2 in lines:
                 # line: Ax+By+C=0
