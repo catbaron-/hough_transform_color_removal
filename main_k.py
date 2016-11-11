@@ -12,12 +12,13 @@ __author__ = 'wtq'
 # apply KM when generate hough lines to reduce number of lines
 # including 3 planes and 4 spheres
 # coding=utf-8
-IMAGE = "input_img/sp6.png"
+IMAGE = "input_img/dog.bmp"
 LOCAL = False
 # LOCAL = True
 QUANTILE = 0.25
-HOUGH_VOTE = 25
-NUM_OF_HOUGH_LINE = 3
+HOUGH_VOTE = 55
+MAX_LINE_GAP = 70
+NUM_OF_HOUGH_LINE = 6
 VECTOR_DIMENSION = 36
 K_ = 5
 HEMISPHERE_NUM = 10
@@ -332,6 +333,8 @@ class ColorRemover:
         """
         max_v = mat.max()
         min_v = mat.min()
+        if min_v < 10:
+            min_v = mat[mat>10].min()
         rng = max_v - min_v
         if rng <= 255:
             lower = min_v - (255 - rng) / 2
@@ -411,6 +414,7 @@ class ColorRemover:
             # adjust length of color line
             k = self.calculate_k(color_line, merge_to)
             print "KKKKKKKKKKKKK:", k
+
         for pixel in self.pixels_of_color_line[color_line]:
             blue, green, red = self.img.get_bgr_value(pixel)
             # move to origin
@@ -711,7 +715,7 @@ class ColorRemover:
             cv2.imshow("hough_sphere_" + sphere, self.hough_spheres[sphere])
             # cv2.waitKey()
             sp_map = np.copy(self.hough_spheres[sphere])
-            lines = cv2.HoughLinesP(self.sphere_maps[sphere], 1, np.pi/180, HOUGH_VOTE, maxLineGap=70)[0]
+            lines = cv2.HoughLinesP(self.sphere_maps[sphere], 1, np.pi/180, HOUGH_VOTE, maxLineGap=MAX_LINE_GAP)[0]
             i = 0
             for x1, y1, x2, y2 in lines:
                 # line: Ax+By+C=0
@@ -838,7 +842,7 @@ class ColorRemover:
         print "locally done"
         # self.show_cluster_points_hough_1()
         # self.show_label_points_1()
-        print "done"
+        # print "done"
         print "Generating color line points...",
         self.generate_color_points_with_label(self.points_of_hough_line)
         print "done"
@@ -868,10 +872,10 @@ class ColorRemover:
         self.adjust_color()
         dir_name = DIR_NAME + self.img.img_name
         cv2.imwrite(dir_name+"/result.bmp", self.gray_after_adjust)
-        # cv2.imshow("result", self.gray_after_adjust)
+        cv2.imshow("result", self.gray_after_adjust)
         # self.show_histogram_of_mat(self.gray_after_adjust, "result")
         cv2.waitKey()
-        print self.calculate_difference()
+        # print self.calculate_difference()
         print "done"
 
     def generate_color_points_with_label(self, label_points_dict):

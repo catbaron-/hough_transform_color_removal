@@ -13,14 +13,14 @@ __author__ = 'wtq'
 # including 3 planes and 4 spheres
 # coding=utf-8
 # IMAGE = "input_img/teapot_ss.png"
-IMAGE = "input_img/cylinder.png"
+IMAGE = "input_img/sphere_2color.png"
 LOCAL = False
 # LOCAL = True
 QUANTILE = 0.25
 HOUGH_VOTE_COLOR_LINE = 25
 MAX_LINE_GAP = 70
 
-HOUGH_VOTE_KB = 30
+HOUGH_VOTE_KB = 150
 NUM_OF_HOUGH_LINE = 3
 VECTOR_DIMENSION = 36
 K_ = 5
@@ -300,7 +300,8 @@ class ColorRemover:
             to_points += self.img.get_bgr_value(to_pixel, self.img_after_adjust)
 
         # generate hough lines for r, g, b
-        hough_points = zip(points, to_points)
+        hough_points = list(set(zip(points, to_points)))
+        print "hough_points:", hough_points
         max_size = np.array(hough_points).max() + 1
         hough_convas = np.zeros((max_size, max_size), dtype=np.uint8)
         hough_convas_3 = np.zeros((max_size, max_size, 3), dtype=np.uint8)
@@ -316,7 +317,7 @@ class ColorRemover:
             hough_convas.itemset((x, y), 255)
         cv2.imshow("hough edge", hough_convas)
         cv2.waitKey()
-        # Reduce the HOUHG
+        # Reduce the HOUGH
         i = 0
         while i < HOUGH_VOTE_KB:
             hough_lines_res = cv2.HoughLinesP(hough_convas, 1, np.pi / 180, HOUGH_VOTE_KB-i, maxLineGap=150)
@@ -341,55 +342,53 @@ class ColorRemover:
             cv2.imshow("hough_lines", hough_convas_3)
             cv2.waitKey()
             print "ks, bs", ks, bs
-            if len(ks) * len(bs) == 0:
-                return 1, 0
-            k = sum(ks) / len(ks)
-            b = sum(bs) / len(bs)
-            return k, b
-        else:
-            # no hough line is generated, use k-norm_back instead
-            ks = []
-            nb = [-1, 1]
-            for pixel, to_pixel in edge_pixels:
-                points = [self.img.get_bgr_value(pixel), ]
-                x, y = pixel
-                for dx in nb:
-                    for dy in nb:
-                        xx = x + dx
-                        yy = y + dy
-                        if (xx, yy) not in self.pixels_of_color_line[color_line]:
-                            continue
-                        points.append(self.img.get_bgr_value((xx, yy)))
-                point_norm_list = map(self.img.get_bgr_norm, points)
-                point_norm = sum(point_norm_list) / float(len(point_norm_list))
-                if point_norm == 0:
-                    continue
-                to_points = [self.img.get_bgr_value(to_pixel, self.img_after_adjust), ]
-                x, y = to_pixel
-                for dx in nb:
-                    for dy in nb:
-                        xx = x + dx
-                        yy = y + dy
-                        if (xx, yy) not in self.pixels_of_color_line[to_color_line]:
-                            continue
-                        to_points.append(self.img.get_bgr_value((xx, yy), self.img_after_adjust))
-                to_point_norm_list = map(self.img.get_bgr_norm, to_points)
-                to_point_norm = sum(to_point_norm_list) / float(len(to_point_norm_list))
-                _k = (to_point_norm - norm_back) / float(point_norm)
-                # if _k > 10:
-                #     print "to/from list:", to_point_norm_list, point_norm_list
-                #     print "to/from:", to_point_norm, point_norm
-                ks.append(_k)
-            ks.sort()
+            if len(ks) * len(bs) != 0:
+                k = sum(ks) / len(ks)
+                b = sum(bs) / len(bs)
+                return k, b
+        # no hough line is generated, use k-norm_back instead
+        ks = []
+        nb = [-1, 1]
+        for pixel, to_pixel in edge_pixels:
+            points = [self.img.get_bgr_value(pixel), ]
+            x, y = pixel
+            for dx in nb:
+                for dy in nb:
+                    xx = x + dx
+                    yy = y + dy
+                    if (xx, yy) not in self.pixels_of_color_line[color_line]:
+                        continue
+                    points.append(self.img.get_bgr_value((xx, yy)))
+            point_norm_list = map(self.img.get_bgr_norm, points)
+            point_norm = sum(point_norm_list) / float(len(point_norm_list))
+            if point_norm == 0:
+                continue
+            to_points = [self.img.get_bgr_value(to_pixel, self.img_after_adjust), ]
+            x, y = to_pixel
+            for dx in nb:
+                for dy in nb:
+                    xx = x + dx
+                    yy = y + dy
+                    if (xx, yy) not in self.pixels_of_color_line[to_color_line]:
+                        continue
+                    to_points.append(self.img.get_bgr_value((xx, yy), self.img_after_adjust))
+            to_point_norm_list = map(self.img.get_bgr_norm, to_points)
+            to_point_norm = sum(to_point_norm_list) / float(len(to_point_norm_list))
+            _k = (to_point_norm - norm_back) / float(point_norm)
+            # if _k > 10:
+            #     print "to/from list:", to_point_norm_list, point_norm_list
+            #     print "to/from:", to_point_norm, point_norm
+            ks.append(_k)
+        ks.sort()
+        mean = 1
+        if len(ks) > KS_LENGTH:
+            mean = np.mean(ks)
+        if mean > K_MAX:
+            mean = K_MAX
+        if mean == 0:
             mean = 1
-            if len(ks) > KS_LENGTH:
-                mean = np.mean(ks)
-            if mean > K_MAX:
-                mean = K_MAX
-            if mean == 0:
-                mean = 1
-            return mean, norm_back
-            # k-norm-back finished
+        return mean, norm_back
+        # k-norm-back finished
 
     @staticmethod
     def normalize(mat):
@@ -488,11 +487,14 @@ class ColorRemover:
         k, b = 1, norm_back
 
         # TODO: show the region and region_to
-        region = np.zeros(self.img.size, dtype=np.int8)  # used for showing the current region
+        regions = np.zeros(self.img.img.shape, dtype=np.uint8)  # used for showing the current region
 
-        print "transform in matrix:"
+        # print "transform in matrix:"
         for pixel in self.pixels_of_color_line[color_line]:
             blue, green, red = self.img.get_bgr_value(pixel)
+            regions.itemset((pixel[0], pixel[1], 0), blue)
+            regions.itemset((pixel[0], pixel[1], 1), green)
+            regions.itemset((pixel[0], pixel[1], 2), red)
             # move to origin
             red -= np.float(r_p0)
             green -= np.float(g_p0)
@@ -510,9 +512,15 @@ class ColorRemover:
 
         if merge_to:
             # adjust length of color line
-
+            for pixel in self.pixels_of_color_line[merge_to]:
+                blue, green, red = self.img.get_bgr_value(pixel)
+                regions.itemset((pixel[0], pixel[1], 0), blue)
+                regions.itemset((pixel[0], pixel[1], 1), green)
+                regions.itemset((pixel[0], pixel[1], 2), red)
             k, b = self.calculate_kb(color_line, merge_to)
-
+        print "k, b:", k, b
+        cv2.imshow("regions", regions)
+        cv2.waitKey()
         for pixel in self.pixels_of_color_line[color_line]:
             # blue, green, red = self.img.get_bgr_value(pixel, self.img_after_adjust)
             # blue = blue*kb + bb

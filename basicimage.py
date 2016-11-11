@@ -57,7 +57,7 @@ class Input:
 
             self.pixels[pixel] = 1
             self.points[point] = 1
-            if blue >= 250 and green >= 250 and red >= 250:  # or blue < 5 and green < 5 and red < 5:
+            if blue >= 250 and green >= 250 and red >= 250 or blue < 5 and green < 5 and red < 5:
                 self.fg_map.itemset(pixel, 0)
                 self.fg_map_show.itemset(pixel, 0)
                 self.bg_pixels[pixel] = "1"
