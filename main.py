@@ -13,14 +13,14 @@ __author__ = 'wtq'
 # including 3 planes and 4 spheres
 # coding=utf-8
 # IMAGE = "input_img/teapot_ss.png"
-IMAGE = "input_img/sphere_2color.png"
+IMAGE = "input_img/dog.bmp"
 LOCAL = False
 # LOCAL = True
 QUANTILE = 0.25
 HOUGH_VOTE_COLOR_LINE = 25
 MAX_LINE_GAP = 70
 
-HOUGH_VOTE_KB = 150
+HOUGH_VOTE_KB = 70
 NUM_OF_HOUGH_LINE = 3
 VECTOR_DIMENSION = 36
 K_ = 5
@@ -301,6 +301,7 @@ class ColorRemover:
 
         # generate hough lines for r, g, b
         hough_points = list(set(zip(points, to_points)))
+        print
         print "hough_points:", hough_points
         max_size = np.array(hough_points).max() + 1
         hough_convas = np.zeros((max_size, max_size), dtype=np.uint8)
@@ -311,19 +312,21 @@ class ColorRemover:
             #     break
             # c += 1
             y, x = map(int, p)  # (y, x) instead of (x, y ) because the hough line will be calculated in reversed way
-            if 0 < p[0] < 255 and 1 < p[1] < 255:
-                cv2.circle(hough_convas, (y, x), 2, [255,255,255])
+            # if 0 < p[0] < 255 and 1 < p[1] < 255:
+            cv2.circle(hough_convas_3, (y, x), 2, [255,255,255])
                 # hough_convas.itemset((x, y), 255)
             hough_convas.itemset((x, y), 255)
-        cv2.imshow("hough edge", hough_convas)
+        cv2.imshow("hough edge", hough_convas_3)
+        cv2.imshow("hough points", hough_convas)
         cv2.waitKey()
         # Reduce the HOUGH
-        i = 0
-        while i < HOUGH_VOTE_KB:
-            hough_lines_res = cv2.HoughLinesP(hough_convas, 1, np.pi / 180, HOUGH_VOTE_KB-i, maxLineGap=150)
+        hough_lines_res = None
+        hough_votes = len(hough_points)
+        while hough_votes > 5:
+            hough_lines_res = cv2.HoughLinesP(hough_convas, 1, np.pi / 180, hough_votes, maxLineGap=150)
             if hough_lines_res != None :
                 break
-            i += 1
+            hough_votes -= 1
         # TODO: if hough vote is not large enoughj, return a flag to use k-norm_back instead
         if hough_lines_res != None:
             hough_lines = hough_lines_res[0]
@@ -347,6 +350,7 @@ class ColorRemover:
                 b = sum(bs) / len(bs)
                 return k, b
         # no hough line is generated, use k-norm_back instead
+        print("hough_line_ks failed")
         ks = []
         nb = [-1, 1]
         for pixel, to_pixel in edge_pixels:
